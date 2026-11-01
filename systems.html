@@ -1,0 +1,252 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>PLRC · Sistemas principales</title>
+<style>
+:root{color-scheme:dark;--bg:#050914;--panel:#0b1423;--line:#1d3550;--cyan:#59d9ff;--blue:#568bff;--green:#71ffb2;--orange:#ffad61;--purple:#bc91ff;--muted:#829ab5;--text:#d9ecff}
+*{box-sizing:border-box}
+body{margin:0;min-height:100vh;padding:22px;background:radial-gradient(ellipse at 50% -10%,#142c49 0,#050914 62%);color:var(--text);font:14px ui-monospace,Consolas,monospace}
+button,a,input{font:inherit}
+header{display:flex;align-items:center;justify-content:space-between;gap:14px;flex-wrap:wrap;border-bottom:1px solid var(--line);padding:0 0 16px;margin-bottom:22px}
+h1{font-size:15px;letter-spacing:.2em;margin:0 0 6px}
+small,.muted{color:var(--muted)}
+.nav{display:flex;gap:8px;flex-wrap:wrap}
+a,.navbtn{color:#a9ddff;text-decoration:none;border:1px solid #294663;background:#0b1727;padding:9px 12px;border-radius:5px;font-size:11px;letter-spacing:.06em;cursor:pointer}
+a:hover,.navbtn:hover{background:#142b44}
+.eyebrow{color:#7ea4c5;font-size:10px;letter-spacing:.18em;text-transform:uppercase}
+.pageTitle{font-size:clamp(23px,4vw,34px);letter-spacing:.08em;margin:8px 0}
+.intro{color:#91a9c3;line-height:1.6;max-width:760px}
+.selector{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:18px;margin-top:24px}
+.module{position:relative;min-height:330px;overflow:hidden;text-align:left;padding:20px;border:1px solid #24415e;border-radius:10px;background:linear-gradient(145deg,rgba(14,31,52,.96),rgba(6,13,24,.97));color:var(--text);cursor:pointer;box-shadow:0 14px 40px #0005;transition:transform .18s,border-color .18s,box-shadow .18s}
+.module:hover{transform:translateY(-3px);border-color:#55b8e8;box-shadow:0 18px 44px #0008,0 0 24px #3a9ad522}
+.module:focus-visible,button:focus-visible,a:focus-visible,input:focus-visible{outline:2px solid var(--cyan);outline-offset:3px}
+.module .tag{font-size:10px;color:#83a8ca;letter-spacing:.16em}
+.module h2{font-size:19px;letter-spacing:.1em;margin:10px 0}
+.module p{color:#91a9c3;line-height:1.5;max-width:420px}
+.module .open{display:inline-block;margin-top:12px;color:var(--cyan);font-size:11px;letter-spacing:.14em}
+.moduleGraphic{height:132px;margin:14px 0 4px;display:flex;align-items:center;justify-content:center;gap:24px;position:relative}
+.pumpSilhouette{width:100px;height:100px;border:3px solid #2d82a6;border-radius:50%;display:grid;place-items:center;position:relative;box-shadow:0 0 26px #2eb9ee22,inset 0 0 22px #2eb9ee16}
+.pumpSilhouette:before{content:"";width:56px;height:56px;border:3px dashed var(--cyan);border-radius:50%;animation:spin 5s linear infinite}
+.pumpSilhouette:after{content:"P-01";position:absolute;font-size:11px;color:#c7f4ff}
+.tankSilhouette{width:42px;height:100px;border:3px solid #387b9f;border-radius:8px 8px 13px 13px;background:linear-gradient(to top,#087da7 0 58%,#0d2032 58%);box-shadow:0 0 20px #168ac433}
+.tankSilhouette.purple{border-color:#805cb4;background:linear-gradient(to top,#633d9c 0 42%,#18162e 42%);box-shadow:0 0 20px #a16be833}
+.pipeLine{height:4px;width:38px;background:linear-gradient(90deg,#3f9bc0,#9eeeff);box-shadow:0 0 10px #44d4ff}
+.rackSilhouette{width:62px;height:116px;border:2px solid #53718d;border-radius:5px;background:#08111e;padding:8px;display:flex;flex-direction:column;gap:7px;box-shadow:0 0 24px #568bff1a}
+.rackSilhouette span{height:23px;border:1px solid #38536e;background:linear-gradient(90deg,#14263a,#1d3c56);border-radius:2px;position:relative}
+.rackSilhouette span:after{content:"";position:absolute;right:5px;top:7px;width:5px;height:5px;border-radius:50%;background:var(--green);box-shadow:0 0 8px var(--green)}
+.view{display:none}.view.active{display:block}
+.viewhead{display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap;margin-bottom:16px}
+.viewhead h2{font-size:18px;letter-spacing:.14em;margin:5px 0}
+.grid{display:grid;grid-template-columns:minmax(0,1.35fr) minmax(280px,.85fr);gap:16px}
+.panel{background:linear-gradient(145deg,rgba(13,27,46,.96),rgba(7,14,25,.97));border:1px solid var(--line);border-radius:8px;padding:16px;box-shadow:0 10px 36px #0005;min-width:0}
+.panel h3{font-size:11px;letter-spacing:.16em;color:#a9dfff;margin:0 0 14px}
+.diagram{width:100%;height:auto;display:block;background:radial-gradient(ellipse,#102b41 0,#07111e 72%);border:1px solid #18334d;border-radius:7px}
+.pipeBase{fill:none;stroke:#18364d;stroke-width:13;stroke-linecap:round;stroke-linejoin:round}
+.pipeBlue{fill:none;stroke:#5bdcff;stroke-width:4;stroke-linecap:round;stroke-dasharray:12 16;animation:dash 1.5s linear infinite}
+.pipePurple{fill:none;stroke:#b68aff;stroke-width:4;stroke-linecap:round;stroke-dasharray:12 16;animation:dash 1.9s linear infinite}
+@keyframes dash{to{stroke-dashoffset:-56}}
+.pumpCore{fill:#0a1a29;stroke:#54bde2;stroke-width:4}
+.pumpRotor,.pumpRotor2{fill:none;stroke-width:3;stroke-dasharray:5 5;transform-box:fill-box;transform-origin:center center;animation:spin 4s linear infinite}
+.pumpRotor{stroke:#79e4ff}
+.pumpCore2{fill:#17132a;stroke:#9f7be0;stroke-width:4}
+.pumpRotor2{stroke:#c9a9ff;animation-duration:4.8s}
+@keyframes spin{to{transform:rotate(360deg)}}
+.svgLabel{font:11px ui-monospace,Consolas,monospace;fill:#c6def3;letter-spacing:1px}.svgSub{font:9px ui-monospace,Consolas,monospace;fill:#829ab5}
+.stats{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:9px;margin-bottom:15px}
+.stat{background:#07101d;border:1px solid #1a2d43;padding:11px;border-radius:5px;min-width:0}
+.stat span{display:block;color:var(--muted);font-size:9px;letter-spacing:.1em;line-height:1.4}
+.stat b{display:block;font-size:20px;color:var(--cyan);margin-top:7px;font-variant-numeric:tabular-nums;overflow-wrap:anywhere}
+.control{border-top:1px solid #1b3047;padding-top:13px;margin-top:13px}
+.controlhead{display:flex;align-items:center;justify-content:space-between;gap:8px;margin-bottom:9px;font-size:11px}
+.controlhead strong{letter-spacing:.05em}
+.value{color:var(--cyan);font-weight:700;font-size:13px}
+.actions{display:flex;align-items:center;gap:8px;margin-top:9px;flex-wrap:wrap}
+.action{border:1px solid #31516e;border-radius:4px;background:#0e1e31;color:#b9ddf6;padding:8px 10px;font-size:10px;letter-spacing:.08em;cursor:pointer}
+.action:hover{background:#17334e}.action.purple{border-color:#654c91;color:#d5c0ff}
+.action:disabled,input:disabled{opacity:.4;cursor:not-allowed}
+.stateLine{font-size:10px;color:var(--muted);margin-top:12px;line-height:1.5}
+.serverGrid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:13px}
+.serverRack{background:#070d17;border:1px solid #34506c;border-radius:6px;padding:12px;min-height:280px;display:flex;flex-direction:column;gap:10px;box-shadow:inset 0 0 22px #000}
+.rackTop{display:flex;justify-content:space-between;gap:6px;font-size:10px;color:#9ec5e4}
+.rackUnits{display:flex;flex-direction:column;gap:8px}
+.unit{height:44px;border:1px solid #263e57;background:linear-gradient(90deg,#101e2e,#172a3d);border-radius:3px;display:flex;align-items:center;gap:8px;padding:7px}
+.led{width:7px;height:7px;border-radius:50%;background:var(--green);box-shadow:0 0 10px var(--green);flex:none}
+.led.off{background:#596779;box-shadow:none}
+.vents{flex:1;height:15px;background:repeating-linear-gradient(90deg,#344b60 0 2px,transparent 2px 5px)}
+.rackMeta{margin-top:auto;color:#8ee8ff;font-size:10px;display:flex;justify-content:space-between;gap:6px}
+.rackStatus{font-size:10px;color:var(--green)}.rackStatus.off{color:#8999aa}
+footer{margin-top:20px;padding-top:13px;border-top:1px solid #172b40;color:#617d98;font-size:10px;text-align:center;line-height:1.6}
+.notice{color:#8ba6c1;font-size:10px;line-height:1.55;margin:10px 0 0}
+@media(max-width:850px){.selector{grid-template-columns:1fr}.grid{grid-template-columns:1fr}.serverGrid{grid-template-columns:1fr}.serverRack{min-height:220px}.module{min-height:290px}}
+@media(max-width:520px){body{padding:13px}.stats{grid-template-columns:1fr 1fr}.moduleGraphic{gap:15px}.viewhead h2{font-size:15px}.panel{padding:12px}.serverGrid{grid-template-columns:1fr}}
+</style>
+</head>
+<body>
+<header>
+  <div><div class="eyebrow">PLRC · CENTRO DE CONTROL</div><h1>SISTEMAS PRINCIPALES</h1><small>SELECCIÓN DE SUBSISTEMA · SIMULACIÓN 2D</small></div>
+  <nav class="nav"><a href="/">← VOLVER AL REACTOR</a><button class="navbtn" id="homeBtn" type="button">INICIO DE SISTEMAS</button></nav>
+</header>
+
+<main>
+  <section id="homeView" class="view active">
+    <div class="eyebrow">PANEL PRINCIPAL / SUBSISTEMAS</div>
+    <div class="pageTitle">¿QUÉ SISTEMA QUERÉS CONTROLAR?</div>
+    <p class="intro">Entrá a cada sector por separado. Las bombas muestran los circuitos ficticios de refrigerante y plasma del reactor; la sala de servidores tiene su propio panel y sus propios estados visuales.</p>
+    <div class="selector">
+      <button class="module" type="button" data-view="pumps">
+        <div class="tag">MÓDULO 01 · FLUIDOS</div><h2>CONTROL DE BOMBAS</h2>
+        <div class="moduleGraphic" aria-hidden="true"><div class="tankSilhouette"></div><div class="pipeLine"></div><div class="pumpSilhouette"></div><div class="pipeLine"></div><div class="tankSilhouette purple"></div></div>
+        <p>Dos circuitos visuales independientes: succión de refrigerante y recirculación de plasma simulado. Encendé o apagá cada bomba desde este panel; los niveles se ajustan con el ratón desde el reactor.</p>
+        <span class="open">ABRIR CONTROL DE BOMBAS →</span>
+      </button>
+      <button class="module" type="button" data-view="servers">
+        <div class="tag">MÓDULO 02 · COMPUTACIÓN</div><h2>SALA DE SERVIDORES</h2>
+        <div class="moduleGraphic" aria-hidden="true"><div class="rackSilhouette"><span></span><span></span><span></span></div><div class="rackSilhouette"><span></span><span></span><span></span></div><div class="rackSilhouette"><span></span><span></span><span></span></div></div>
+        <p>Vista independiente de los racks de cómputo, almacenamiento y red. Cada rack tiene un interruptor visual dentro de esta simulación.</p>
+        <span class="open">ABRIR SALA DE SERVIDORES →</span>
+      </button>
+    </div>
+  </section>
+
+  <section id="pumpsView" class="view">
+    <div class="viewhead"><div><div class="eyebrow">SISTEMAS PRINCIPALES / MÓDULO 01</div><h2>CONTROL DE BOMBAS</h2><small>SUCCIÓN Y RECIRCULACIÓN · CIRCUITOS SIMULADOS</small></div><button class="action" data-back type="button">← VOLVER A SISTEMAS</button></div>
+    <div class="grid">
+      <section class="panel">
+        <h3>DIAGRAMA DE CIRCUITOS</h3>
+        <svg class="diagram" viewBox="0 0 760 390" role="img" aria-label="Diagrama ficticio de dos circuitos, refrigerante y plasma simulado">
+          <defs>
+            <linearGradient id="tankBlue" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#0d2639"/><stop offset="1" stop-color="#087da7"/></linearGradient>
+            <linearGradient id="tankPurple" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#24193b"/><stop offset="1" stop-color="#6842a0"/></linearGradient>
+            <radialGradient id="coreGlow"><stop stop-color="#65dcff" stop-opacity=".4"/><stop offset="1" stop-color="#65dcff" stop-opacity="0"/></radialGradient>
+          </defs>
+          <text x="30" y="30" class="svgLabel">CIRCUITO A · REFRIGERANTE</text>
+          <path class="pipeBase" d="M125 115 H270 M350 115 H585"/><path id="blueFlow" class="pipeBlue" d="M125 115 H270 M350 115 H585"/>
+          <rect x="42" y="65" width="82" height="105" rx="10" fill="url(#tankBlue)" stroke="#4cb9dc" stroke-width="3"/><path d="M52 120 H114" stroke="#6ce4ff" stroke-width="2" opacity=".65"/><text x="83" y="188" text-anchor="middle" class="svgSub">DEPÓSITO</text>
+          <circle cx="310" cy="115" r="39" class="pumpCore"/><circle cx="310" cy="115" r="25" class="pumpRotor"/><text x="310" y="120" text-anchor="middle" class="svgLabel">P-01</text><text x="310" y="174" text-anchor="middle" class="svgSub">BOMBA REFRIGERANTE</text>
+          <circle cx="635" cy="115" r="42" fill="url(#coreGlow)"/><rect x="590" y="72" width="92" height="86" rx="10" fill="#101f31" stroke="#457b9b" stroke-width="2"/><text x="636" y="108" text-anchor="middle" class="svgLabel">NÚCLEO</text><text x="636" y="127" text-anchor="middle" class="svgSub">PLRC</text>
+          <text x="30" y="230" class="svgLabel">CIRCUITO B · PLASMA SIMULADO</text>
+          <path class="pipeBase" d="M125 305 H270 M350 305 H585"/><path id="purpleFlow" class="pipePurple" d="M125 305 H270 M350 305 H585"/>
+          <rect x="42" y="255" width="82" height="105" rx="10" fill="url(#tankPurple)" stroke="#9c7bd2" stroke-width="3"/><path d="M52 315 H114" stroke="#d0b4ff" stroke-width="2" opacity=".65"/><text x="83" y="378" text-anchor="middle" class="svgSub">RESERVA</text>
+          <circle cx="310" cy="305" r="39" class="pumpCore2"/><circle cx="310" cy="305" r="25" class="pumpRotor2"/><text x="310" y="310" text-anchor="middle" class="svgLabel">P-02</text><text x="310" y="364" text-anchor="middle" class="svgSub">BOMBA DE RECIRCULACIÓN</text>
+          <circle cx="635" cy="305" r="42" fill="url(#coreGlow)"/><rect x="590" y="262" width="92" height="86" rx="10" fill="#19172a" stroke="#8a6ab9" stroke-width="2"/><text x="636" y="298" text-anchor="middle" class="svgLabel">NÚCLEO</text><text x="636" y="317" text-anchor="middle" class="svgSub">PLRC</text>
+        </svg>
+        <p class="notice">Esquema conceptual y animado para el videojuego/simulador. No representa una instalación real ni controla bombas físicas.</p>
+      </section>
+      <section class="panel">
+        <h3>TELEMETRÍA DEL REACTOR</h3>
+        <div class="stats">
+          <div class="stat"><span>TEMPERATURA</span><b id="temp">20 °C</b></div>
+          <div class="stat"><span>ESTADO DEL NÚCLEO</span><b id="phase" style="font-size:14px">EN ESPERA</b></div>
+        </div>
+        <div class="control">
+          <div class="controlhead"><strong style="color:var(--cyan)">P-01 · BOMBA REFRIGERANTE</strong><span class="value" id="coolValue">APAGADA</span></div>
+          <div class="actions"><button id="coolToggle" class="action" type="button">ENCENDER BOMBA</button><span class="muted" id="coolStatus">APAGADA</span></div>
+        </div>
+        <div class="control">
+          <div class="controlhead"><strong style="color:var(--purple)">P-02 · RECIRCULACIÓN DE PLASMA</strong><span class="value" id="fuelValue" style="color:var(--purple)">APAGADA</span></div>
+          <div class="actions"><button id="fuelToggle" class="action purple" type="button">ENCENDER BOMBA</button><span class="muted" id="fuelStatus">APAGADA</span></div>
+        </div>
+        <p class="stateLine" id="pumpPrereq">Requisito previo: encendé primero los tres racks de servidores.</p>
+        <p class="stateLine" id="connection">Conectando al servidor local…</p>
+        <p class="notice">Los cambios se comparten con el panel principal del simulador. Las bombas solo se pueden activar después de encender los tres racks.</p>
+      </section>
+    </div>
+  </section>
+
+  <section id="serversView" class="view">
+    <div class="viewhead"><div><div class="eyebrow">SISTEMAS PRINCIPALES / MÓDULO 02</div><h2>SALA DE SERVIDORES</h2><small>COMPUTE · STORAGE · NETWORK</small></div><button class="action" data-back type="button">← VOLVER A SISTEMAS</button></div>
+    <section class="panel">
+      <h3>RACKS · CONTROL VISUAL LOCAL</h3>
+      <div class="serverGrid">
+        <article class="serverRack" data-rack="compute"><div class="rackTop"><b>RACK A · COMPUTE</b><span>01</span></div><div class="rackUnits"><div class="unit"><i class="led"></i><i class="led"></i><div class="vents"></div></div><div class="unit"><i class="led"></i><i class="led"></i><div class="vents"></div></div><div class="unit"><i class="led"></i><i class="led"></i><div class="vents"></div></div></div><div class="rackMeta"><span>CPU</span><b>38 °C</b></div><div class="rackStatus off">APAGADO</div><button class="action rackToggle" type="button">ENCENDER RACK</button></article>
+        <article class="serverRack" data-rack="storage"><div class="rackTop"><b>RACK B · STORAGE</b><span>02</span></div><div class="rackUnits"><div class="unit"><i class="led"></i><i class="led"></i><div class="vents"></div></div><div class="unit"><i class="led"></i><i class="led"></i><div class="vents"></div></div><div class="unit"><i class="led"></i><i class="led"></i><div class="vents"></div></div></div><div class="rackMeta"><span>DISK</span><b>32 °C</b></div><div class="rackStatus off">APAGADO</div><button class="action rackToggle" type="button">ENCENDER RACK</button></article>
+        <article class="serverRack" data-rack="network"><div class="rackTop"><b>RACK C · NETWORK</b><span>03</span></div><div class="rackUnits"><div class="unit"><i class="led"></i><i class="led"></i><div class="vents"></div></div><div class="unit"><i class="led"></i><i class="led"></i><div class="vents"></div></div><div class="unit"><i class="led"></i><i class="led"></i><div class="vents"></div></div></div><div class="rackMeta"><span>NET</span><b>29 °C</b></div><div class="rackStatus off">APAGADO</div><button class="action rackToggle" type="button">ENCENDER RACK</button></article>
+      </div>
+      <p class="notice">Los interruptores representan estados ficticios dentro del simulador. No controlan servidores físicos.</p>
+    </section>
+  </section>
+</main>
+<footer>PLRC · SIMULACIÓN VISUAL LOCAL · LOS ESTADOS DE BOMBAS SE SINCRONIZAN CON EL REACTOR; LOS RACKS SON VISUALES.</footer>
+
+<script>
+const $ = (id) => document.getElementById(id);
+const views = {home:$('homeView'),pumps:$('pumpsView'),servers:$('serversView')};
+function showView(name){Object.entries(views).forEach(([key,node])=>node.classList.toggle('active',key===name));window.scrollTo({top:0,behavior:'smooth'});}
+document.querySelectorAll('[data-view]').forEach(btn=>btn.addEventListener('click',()=>showView(btn.dataset.view)));
+document.querySelectorAll('[data-back]').forEach(btn=>btn.addEventListener('click',()=>showView('home')));
+$('homeBtn').addEventListener('click',()=>showView('home'));
+
+let state={temp:20,fuel:0,coolant:0,servers:{compute:false,storage:false,network:false},ignited:false,phase:'NORMAL',shieldIntegrity:100};
+let lastCool=30,lastFuel=20;
+function serversReady(s=state){const r=s.servers||{};return !!r.compute&&!!r.storage&&!!r.network;}
+function sendCommand(command){return fetch('/cmd',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(command)}).catch(()=>{$('connection').textContent='No se pudo enviar el cambio al servidor local.';});}
+function sendSet(field,value){return sendCommand({type:'set',[field]:Number(value)});}
+function phaseName(s){if(s.phase==='MELTDOWN')return 'MELTDOWN';if(s.phase==='COOLDOWN')return 'ENFRIANDO';return s.ignited?'ACTIVO':'EN ESPERA';}
+function renderRacks(s){
+  const rackState=s.servers||{compute:false,storage:false,network:false};
+  document.querySelectorAll('.serverRack').forEach(rack=>{
+    const on=!!rackState[rack.dataset.rack];
+    const status=rack.querySelector('.rackStatus');
+    const button=rack.querySelector('.rackToggle');
+    status.textContent=on?'ENCENDIDO':'APAGADO';
+    status.classList.toggle('off',!on);
+    button.textContent=on?'APAGAR RACK':'ENCENDER RACK';
+    button.dataset.on=String(on);
+    rack.querySelectorAll('.led').forEach(led=>led.classList.toggle('off',!on));
+    rack.querySelectorAll('.vents').forEach(v=>v.style.opacity=on?'1':'.25');
+  });
+}
+function render(s){
+  $('temp').textContent=Math.round(s.temp).toLocaleString('es-AR')+' °C';
+  $('phase').textContent=phaseName(s);
+  $('phase').style.color=s.phase==='NORMAL'?'#71ffb2':'#ffb36b';
+  if(Number(s.coolant)>0)lastCool=Number(s.coolant);
+  if(Number(s.fuel)>0)lastFuel=Number(s.fuel);
+  const coolOn=Number(s.coolant)>0, fuelOn=Number(s.fuel)>0;
+  $('coolValue').textContent=coolOn?Math.round(s.coolant)+'% · ENCENDIDA':'APAGADA';
+  $('fuelValue').textContent=fuelOn?Math.round(s.fuel)+'% · ENCENDIDA':'APAGADA';
+  $('coolStatus').textContent=coolOn?'ENCENDIDA':'APAGADA';
+  $('fuelStatus').textContent=fuelOn?'ENCENDIDA':'APAGADA';
+  $('coolToggle').textContent=coolOn?'APAGAR BOMBA':'ENCENDER BOMBA';
+  $('fuelToggle').textContent=fuelOn?'APAGAR BOMBA':'ENCENDER BOMBA';
+  const racks=s.servers||{compute:false,storage:false,network:false};
+  const count=['compute','storage','network'].filter(k=>!!racks[k]).length;
+  const ready=count===3;
+  const locked=s.phase!=='NORMAL';
+  $('coolToggle').disabled=locked||!ready;
+  $('fuelToggle').disabled=locked||!ready;
+  $('pumpPrereq').textContent=ready?'Servidores listos · podés encender o apagar las dos bombas simuladas.':'REQUISITO: encendé los tres racks de servidores ('+count+'/3) antes de activar las bombas.';
+  $('pumpPrereq').style.color=ready?'#71ffb2':'#ffbd78';
+  $('blueFlow').style.opacity=coolOn?Math.max(.15,s.coolant/100):.08;
+  $('purpleFlow').style.opacity=fuelOn?Math.max(.15,s.fuel/100):.08;
+  // La animación de los rotores permanece quieta cuando la bomba está apagada.
+  document.querySelector('.pumpRotor').style.animationPlayState=coolOn?'running':'paused';
+  document.querySelector('.pumpRotor2').style.animationPlayState=fuelOn?'running':'paused';
+  renderRacks(s);
+}
+async function refresh(){try{const response=await fetch('/state',{cache:'no-store'});if(!response.ok)throw Error('offline');state=await response.json();render(state);$('connection').textContent=state.message||'Conectado · estados compartidos con el reactor simulado';}catch(e){$('connection').textContent='Sin conexión. Abrí este panel desde http://localhost:3000/systems';}}
+function togglePump(field,lastValue){
+  if(!serversReady()){
+    $('pumpPrereq').textContent='REQUISITO PENDIENTE: encendé primero los tres servidores.';
+    $('pumpPrereq').style.color='#ffbd78';
+    return;
+  }
+  if(state.phase!=='NORMAL')return;
+  const current=Number(state[field])||0;
+  const next=current>0?0:(lastValue||30);
+  sendSet(field,next);
+}
+$('coolToggle').addEventListener('click',()=>togglePump('coolant',lastCool));
+$('fuelToggle').addEventListener('click',()=>togglePump('fuel',lastFuel));
+
+document.querySelectorAll('.rackToggle').forEach(btn=>btn.addEventListener('click',()=>{
+  const rack=btn.closest('.serverRack');
+  const on=btn.dataset.on==='true';
+  sendCommand({type:'setServer',rack:rack.dataset.rack,on:!on});
+}));
+refresh();setInterval(refresh,800);
+</script>
+</body>
+</html>

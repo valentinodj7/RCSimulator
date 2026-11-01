@@ -1,0 +1,13 @@
+{
+  "name": "plrc-2d-reactor",
+  "version": "1.0.0",
+  "description": "Simulador de reactor en la nube",
+  "main": "server.js",
+  "scripts": {
+    "start": "node server.js"
+  },
+  "dependencies": {},
+  "engines": {
+    "node": ">=18.0.0"
+  }
+}

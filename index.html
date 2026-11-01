@@ -1,0 +1,1785 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>PLRC 2D</title>
+<style>
+:root{--bg:#05060a;--panel:#0b0e16;--line:#1c2433;--txt:#cfe3ff;--dim:#6b7a96;--accent:#ff7a1a}
+*{box-sizing:border-box}
+html,body{margin:0;height:100%;background:var(--bg);color:var(--txt);font-family:ui-monospace,Consolas,monospace;overflow:hidden}
+#app{position:fixed;inset:0}
+canvas{position:absolute;inset:0;width:100%;height:100%;display:block}
+#alert{position:absolute;left:0;right:0;top:80px;text-align:center;font-size:clamp(28px,6vw,64px);font-weight:700;letter-spacing:.15em;pointer-events:none;display:none;text-shadow:0 0 24px currentColor}
+
+/* franja de arriba */
+#top{position:absolute;top:0;left:0;right:0;z-index:6;display:flex;align-items:center;gap:16px;padding:10px 16px;background:rgba(11,14,22,.9);border-bottom:1px solid var(--line)}
+#brand{min-width:200px}
+h1{margin:0 0 6px;font-size:12px;letter-spacing:.2em;color:var(--dim)}
+#status{font-size:12px;padding:5px 10px;border:1px solid var(--line);border-radius:4px;text-align:center;letter-spacing:.08em}
+#status.on{color:#7dffb0;border-color:#1f6b45}
+#status.warn{color:#ffb347;border-color:#7a4a10;animation:blink .5s infinite alternate}
+#status.melt{color:#ff4d4d;border-color:#7a1010;animation:blink .2s infinite alternate}
+#status.cool{color:#ffb27a;border-color:#7a4a2a}
+@keyframes blink{from{opacity:1}to{opacity:.35}}
+#link{font-size:10px;color:var(--dim);margin-top:4px}
+#link.ok{color:#7dffb0}
+#requirements{font-size:10px;color:#ffbd78;margin-top:5px;line-height:1.4;max-width:260px}
+#nav{display:flex;gap:7px;align-items:center}#nav a{color:#8fb4ff;text-decoration:none;border:1px solid #263650;padding:8px 10px;border-radius:4px;font-size:10px;letter-spacing:.08em}#nav a:hover{background:#17243a;color:#fff}
+#tempbox{flex:1;min-width:0;text-align:center}
+#temp{font-size:32px;font-weight:700;font-variant-numeric:tabular-nums;line-height:1.1}
+#thermo{height:14px;max-width:720px;margin:6px auto 0;background:#10151f;border:1px solid var(--line);border-radius:3px;overflow:hidden}
+#fill{height:100%;width:0;background:linear-gradient(90deg,#4a5bff,#ff3d8b,#ff8a1a,#fff3a0)}
+.ticks{display:flex;justify-content:space-between;max-width:720px;margin:3px auto 0;font-size:10px;color:var(--dim)}
+#sndbox{display:flex;align-items:center;gap:8px}
+#sndbox button{flex:none;padding:8px 10px;font-size:11px;color:var(--dim)}
+#sndbox button.on{color:#8fe3ff;border-color:#1c5b73}
+#sndbox input[type=range]{width:100px}
+
+/* controles de abajo: visibles desde que abre el simulador */
+#bottom{position:absolute;left:0;right:0;bottom:0;padding:12px 16px;display:flex;align-items:flex-end;justify-content:space-between;gap:12px;flex-wrap:wrap;opacity:1}
+#bottom>*{pointer-events:auto}
+.card{background:rgba(11,14,22,.88);border:1px solid var(--line);border-radius:6px;padding:12px;width:min(340px,44vw)}
+#ctr{display:flex;gap:10px;flex:none}
+label{display:flex;justify-content:space-between;font-size:12px;color:var(--dim);margin-bottom:6px}
+input[type=range]{width:100%;accent-color:var(--accent)}
+button{flex:1;padding:12px 22px;font:inherit;font-weight:700;letter-spacing:.1em;border-radius:4px;border:1px solid var(--line);background:#121826;color:var(--txt);cursor:pointer}
+button:hover:not(:disabled){filter:brightness(1.3)}
+button:disabled{opacity:.35;cursor:not-allowed}
+#ign{border-color:#1f6b45;color:#7dffb0}
+#scram{border-color:#7a1010;color:#ff6b6b}
+
+
+/* HUD térmico y de integridad del escudo: telemetría ficticia del simulador */
+#thermalHud{position:absolute;z-index:4;left:calc(50% + clamp(105px,17vw,220px));top:42%;transform:translateY(-50%);width:196px;padding:10px 12px;background:rgba(7,13,23,.82);border:1px solid #29415d;border-radius:6px;box-shadow:0 8px 28px #0007;pointer-events:none;backdrop-filter:blur(3px)}
+#thermalState{font-size:12px;font-weight:800;letter-spacing:.16em;color:#7dffb0}
+#thermalDetail{font-size:9px;color:#8fa7c1;line-height:1.4;margin-top:4px}
+#shieldHead{display:flex;justify-content:space-between;gap:8px;margin-top:10px;color:#9bb4cc;font-size:9px;letter-spacing:.08em}
+#shieldValue{font-size:11px;color:#7dffb0;font-weight:800}
+#shieldBar{height:7px;margin-top:5px;background:#111c2b;border:1px solid #30435b;border-radius:9px;overflow:hidden}
+#shieldFill{height:100%;width:100%;background:linear-gradient(90deg,#49d5ff,#7dffb0);transition:width .25s,background .25s}
+#thermalHud.unstable{border-color:#9a6a32}#thermalHud.unstable #thermalState{color:#ffbd78}
+#thermalHud.caution{border-color:#a48b37}#thermalHud.caution #thermalState{color:#ffe27a}
+#thermalHud.warning{border-color:#a85b27}#thermalHud.warning #thermalState{color:#ffad61}
+#thermalHud.danger{border-color:#a52f35;box-shadow:0 0 24px #b52e3544}#thermalHud.danger #thermalState{color:#ff6068;animation:blink .35s infinite alternate}
+@media(max-width:700px){#thermalHud{left:auto;right:9px;top:52%;width:154px;padding:8px 9px}#thermalDetail{font-size:8px}}
+
+/* toque ciencia ficción */
+body::after{content:"";position:fixed;inset:0;pointer-events:none;z-index:40;background:repeating-linear-gradient(0deg,rgba(150,210,255,.028) 0 1px,transparent 1px 3px);box-shadow:inset 0 0 140px rgba(0,0,0,.5)}
+h1{color:#7fb8d8;text-shadow:0 0 12px rgba(80,200,255,.35)}
+#top{border-bottom-color:#1d4a63;box-shadow:0 6px 28px rgba(60,190,255,.10)}
+#missions,#thermalHud{border-color:#2a5675}
+
+/* contratos, eventos y avisos */
+#fx{z-index:2;pointer-events:none}
+#missions{position:absolute;z-index:4;left:12px;top:100px;width:244px;padding:10px 12px;background:rgba(7,13,23,.84);border:1px solid #29415d;border-radius:6px;box-shadow:0 8px 28px #0007;pointer-events:none;backdrop-filter:blur(3px)}
+.mhead{display:flex;justify-content:space-between;align-items:baseline;gap:8px;font-size:10px;letter-spacing:.14em;color:#8fa7c1}
+#mScore{font-size:15px;color:#ffe27a;letter-spacing:.04em}
+.msub{display:flex;justify-content:space-between;gap:6px;margin-top:4px;font-size:9px;color:#6f86a3}
+#mName{margin-top:9px;font-size:12px;font-weight:800;letter-spacing:.06em;color:#cfe3ff;line-height:1.3}
+#mDesc{font-size:9px;color:#8fa7c1;line-height:1.4;margin-top:3px}
+#gauge{position:relative;height:12px;margin-top:10px;background:#0f1826;border:1px solid #30435b;border-radius:3px;overflow:hidden}
+#gBand{position:absolute;top:0;bottom:0;display:none;background:rgba(113,255,178,.28);border-left:1px solid #71ffb2;border-right:1px solid #71ffb2}
+#gFill{position:absolute;left:0;top:0;bottom:0;width:0;background:linear-gradient(90deg,#3a6df0,#59d9ff);opacity:.85;transition:width .15s}
+.gticks{display:flex;justify-content:space-between;font-size:8px;color:#5d718a;margin-top:2px}
+#mOut{display:flex;justify-content:space-between;align-items:baseline;margin-top:7px}
+#mMW{font-size:20px;font-weight:700;font-variant-numeric:tabular-nums}
+#mTrend{font-size:10px;color:#8fa7c1}
+.mbar{height:6px;margin-top:8px;background:#111c2b;border:1px solid #30435b;border-radius:9px;overflow:hidden}
+#mProg{height:100%;width:0;background:linear-gradient(90deg,#49d5ff,#7dffb0);transition:width .15s}
+.mrow{display:flex;justify-content:space-between;margin-top:5px;font-size:9px;color:#8fa7c1;letter-spacing:.06em}
+.mrow b{color:#ffe27a}
+#evBanner{position:absolute;z-index:4;left:12px;top:100px;width:244px;display:none;align-items:center;gap:10px;padding:8px 12px 10px;background:rgba(7,13,23,.88);border:1px solid #6b5b2a;border-radius:6px;pointer-events:none;box-shadow:0 8px 28px #0007}
+#evBanner.show{display:flex;animation:evIn .4s}
+@keyframes evIn{from{opacity:0;transform:translateY(-8px)}to{opacity:1;transform:none}}
+#evIcon{font-size:26px}
+#evTxt{flex:1;min-width:0}
+#evName{display:block;font-size:12px;font-weight:800;letter-spacing:.14em}
+#evDesc{display:block;font-size:10px;color:#a8bdd3;margin-top:2px}
+#evFix{display:none;flex:none;width:auto;margin-top:6px;padding:5px 10px;font-size:10px;letter-spacing:.08em;pointer-events:auto;border-color:#9a2f37;color:#ffb3b8}
+#evBar{position:absolute;left:0;right:0;bottom:0;height:3px;background:#111c2b;border-radius:0 0 6px 6px;overflow:hidden}
+#evFill{display:block;height:100%;width:100%;background:currentColor}
+#evBanner[data-ev=summer]{color:#ffad61;border-color:#9a5a22}
+#evBanner[data-ev=winter]{color:#8fe3ff;border-color:#2b6a86}
+#evBanner[data-ev=storm]{color:#c9a9ff;border-color:#6a4aa0}
+#evBanner[data-ev=pump],#evBanner[data-ev=pump2]{color:#ff6b73;border-color:#9a2f37}
+#evBanner[data-ev=demand]{color:#ffe27a;border-color:#8a7424}
+#evBanner[data-ev=pulse]{color:#e8f0ff;border-color:#8aa0c0}
+#toasts{position:absolute;z-index:5;right:12px;top:100px;width:min(300px,60vw);display:flex;flex-direction:column;gap:6px;pointer-events:none}
+.toast{padding:8px 10px;background:rgba(7,13,23,.9);border:1px solid #29415d;border-left-width:3px;border-radius:5px;font-size:10px;line-height:1.4;color:#cfe3ff;animation:toastIn .3s;transition:opacity .5s}
+.toast.out{opacity:0}
+.toast.ok{border-color:#2a7a52;color:#b8ffd6}
+.toast.bad{border-color:#a52f35;color:#ffb3b8}
+.toast.mission{border-color:#3a6df0;color:#cfdcff}
+.toast.event{border-color:#a48b37;color:#ffe9a8}
+@keyframes toastIn{from{opacity:0;transform:translateX(14px)}to{opacity:1;transform:none}}
+#cl.fail,#cr.fail{border-color:#a52f35;animation:failPulse .7s infinite alternate}
+@keyframes failPulse{from{box-shadow:0 0 0 #ff3d4a00}to{box-shadow:0 0 18px #ff3d4a99}}
+@media(max-width:900px){#missions,#evBanner{width:190px}}
+@media(max-width:700px){#missions,#evBanner{width:150px}#missions{padding:7px 8px}#mDesc,.msub,#evDesc,.gticks{display:none}#toasts{width:45vw}.toast:nth-last-child(n+3){display:none}#evIcon{font-size:20px}#evName{font-size:10px;letter-spacing:.08em}}
+
+/* animación de inicio */
+#count{position:absolute;left:50%;top:50%;transform:translate(-50%,-50%);z-index:3;pointer-events:none;font-weight:700;font-variant-numeric:tabular-nums;color:#cfe3ff;text-shadow:0 0 18px rgba(120,160,255,.6)}
+#intromsg{position:absolute;left:0;right:0;bottom:120px;text-align:center;z-index:3;pointer-events:none;font-size:clamp(11px,2.2vw,14px);letter-spacing:.25em;color:#8fb4ff}
+#skip{position:fixed;right:16px;bottom:14px;z-index:7;display:none}
+
+@media (max-width:700px){
+  #top{flex-wrap:wrap;gap:8px}
+  #tempbox{order:3;flex-basis:100%}
+  #temp{font-size:26px}
+  #ctr{order:0;width:100%;justify-content:center}
+  .card{width:calc(50% - 6px)}
+}
+
+#stamp{position:fixed;left:50%;bottom:4px;transform:translateX(-50%);z-index:41;font-size:9px;letter-spacing:.12em;color:#5d7a96;opacity:.6;pointer-events:none}
+/* pantalla de reconstrucción */
+#rebuild{position:fixed;left:0;right:0;top:100px;bottom:0;z-index:20;display:flex;align-items:center;justify-content:center;flex-direction:column;gap:14px;text-align:center;background:radial-gradient(ellipse at center,rgba(8,12,22,.72),rgba(2,4,9,.93));opacity:0;pointer-events:none;transition:opacity 1.2s}
+#rebuild.show{opacity:1;pointer-events:auto}
+#rebuild .rbRing{width:90px;height:90px;border-radius:50%;border:3px dashed #ff9a3c;box-shadow:0 0 24px rgba(255,150,50,.35);animation:rbSpin 6s linear infinite}
+@keyframes rbSpin{to{transform:rotate(360deg)}}
+#rebuild h2{margin:0;font-size:clamp(22px,4.6vw,52px);letter-spacing:.16em;color:#ffb347;text-shadow:0 0 22px rgba(255,150,40,.55)}
+#rebuild p{margin:0;font-size:clamp(11px,1.8vw,14px);letter-spacing:.14em;color:#8fb4d8}
+#rbBar{width:min(520px,80vw);height:10px;border:1px solid #6a4a22;border-radius:5px;overflow:hidden;background:repeating-linear-gradient(45deg,#1a1408 0 8px,#120d05 8px 16px)}
+#rbFill{display:block;height:100%;width:0;background:linear-gradient(90deg,#ff7a2a,#ffd35a);transition:width .25s}
+#rbTime{font-size:clamp(14px,2.4vw,22px);color:#ffe3b0;font-variant-numeric:tabular-nums}
+</style>
+</head>
+<body>
+<div id="app">
+  <canvas id="cv"></canvas>
+  <canvas id="fx"></canvas>
+  <div id="stamp">intro: cuenta 27 s + ignición 10 s</div>
+  <div id="rebuild"><div class="rbRing"></div><h2>REACTOR EN RECONSTRUCCIÓN</h2><p>A.R.I.A.: retirando escombros · reensamblando el núcleo</p><div id="rbBar"><span id="rbFill"></span></div><div id="rbTime"></div></div>
+  <div id="alert"></div>
+  <div id="count"></div>
+  <div id="intromsg"></div>
+
+  <aside id="missions" aria-live="polite">
+    <div class="mhead"><span id="mTitle">CONTRATOS DE ENERGÍA</span><b id="mScore">★ 0</b></div>
+    <div class="msub"><span id="mStreak">RACHA x0</span><span id="mBest">RÉCORD 0</span><span id="mDone">0 entregas</span></div>
+    <div id="mName">SIN CONTRATO</div>
+    <div id="mDesc">Encendé el reactor para recibir contratos.</div>
+    <div id="gauge"><div id="gBand"></div><div id="gFill"></div></div>
+    <div class="gticks"><span>0</span><span>250</span><span>500 MW</span></div>
+    <div id="mOut"><b id="mMW">0 MW</b><span id="mTrend">—</span></div>
+    <div class="mbar"><div id="mProg"></div></div>
+    <div class="mrow"><span id="mProgTxt">ENTREGA 0/0 s</span><span id="mTime">—</span></div>
+    <div class="mrow"><span>RECOMPENSA</span><b id="mReward">★ 0</b></div>
+  </aside>
+
+  <div id="evBanner" data-ev="">
+    <span id="evIcon"></span>
+    <div id="evTxt"><b id="evName"></b><small id="evDesc"></small><button id="evFix" type="button">🔧 REPARAR</button></div>
+    <div id="evBar"><i id="evFill"></i></div>
+  </div>
+
+  <div id="toasts"></div>
+  <section id="thermalHud" aria-live="polite">
+    <div id="thermalState">NOMINAL</div>
+    <div id="thermalDetail">RANGO TÉRMICO NORMAL</div>
+    <div id="shieldHead"><span>INTEGRIDAD DEL ESCUDO</span><b id="shieldValue">100%</b></div>
+    <div id="shieldBar"><div id="shieldFill"></div></div>
+  </section>
+
+  <div id="top">
+    <div id="brand">
+      <h1>PLASMA REACTOR CORE</h1>
+      <div id="status">CONECTANDO...</div>
+      <div id="link">sin conexión</div>
+      <div id="requirements">SERVIDORES 0/3 · BOMBAS 0/2</div>
+    </div>
+    <div id="tempbox">
+      <div id="temp">20 °C</div>
+      <div id="thermo"><div id="fill"></div></div>
+      <div class="ticks"><span>20</span><span>500.000</span></div>
+    </div>
+    <nav id="nav"><a href="/">REACTOR</a><a href="/systems">SISTEMAS PRINCIPALES</a></nav>
+    <div id="sndbox">
+      <button id="snd">🔇 ACTIVAR SONIDO</button>
+      <button id="mus">♪ MÚSICA</button>
+      <button id="voz">🗣 VOZ IA</button>
+      <input id="vol" type="range" min="0" max="100" value="60" title="Volumen general">
+      <input id="volVoz" type="range" min="0" max="100" value="80" title="Volumen de la voz IA">
+    </div>
+  </div>
+
+  <div id="bottom">
+    <div class="card" id="cl">
+      <label><span>REFRIGERANTE</span><span id="coolV">30%</span></label>
+      <input id="cool" type="range" min="0" max="100" value="30">
+    </div>
+    <div id="ctr">
+      <button id="ign">IGNICIÓN</button>
+      <button id="scram">SCRAM</button>
+    </div>
+    <div class="card" id="cr">
+      <label><span>INYECCIÓN DE PLASMA</span><span id="fuelV">0%</span></label>
+      <input id="fuel" type="range" min="0" max="100" value="0">
+    </div>
+  </div>
+  <button id="skip">SALTAR ▸</button>
+</div>
+
+<script>
+const $ = (id) => document.getElementById(id);
+const cv = $('cv'), ctx = cv.getContext('2d');
+const fx = $('fx'), fctx = fx.getContext('2d');
+const el = {
+  fuel: $('fuel'), cool: $('cool'), fuelV: $('fuelV'), coolV: $('coolV'),
+  ign: $('ign'), scram: $('scram'), status: $('status'), temp: $('temp'),
+  fill: $('fill'), link: $('link'), alert: $('alert'), requirements: $('requirements'),
+  vol: $('vol'), volVoz: $('volVoz'), snd: $('snd'), mus: $('mus'), top: $('top'), bottom: $('bottom'),
+  skip: $('skip'), count: $('count'), intromsg: $('intromsg'),
+  thermalHud: $('thermalHud'), thermalState: $('thermalState'), thermalDetail: $('thermalDetail'),
+  shieldValue: $('shieldValue'), shieldFill: $('shieldFill'),
+  voz: $('voz'), cl: $('cl'), cr: $('cr'), evFix: $('evFix'), missions: $('missions'), toasts: $('toasts'),
+  evBanner: $('evBanner'), evIcon: $('evIcon'), evName: $('evName'), evDesc: $('evDesc'), evFill: $('evFill'),
+};
+const LOG_RANGE = Math.log10(500000 / 20);
+let localRequirementMessage = '';
+let localRequirementTimer = null;
+function showRequirementMessage(message) {
+  localRequirementMessage = message;
+  el.requirements.textContent = message;
+  el.requirements.style.color = '#ffbd78';
+  clearTimeout(localRequirementTimer);
+  localRequirementTimer = setTimeout(() => { localRequirementMessage = ''; syncUI(); }, 5000);
+}
+
+// ---------- sonido y música (Web Audio, todo sintetizado) ----------
+const Snd = (() => {
+  let ac = null, master, noiseBuf;
+  let enabled = true, vol = 0.6, lastBeep = 0;
+  let humGain, hum1, hum2, humFilter, noiseGain, noiseFilter;
+  let sirenGain, steamGain;
+  // música de fondo
+  let musicGain, musicLP, delayIn, musicOn = true, musicLevel = 1, musicTimer = null, nextNote = 0, mstep = 0;
+  // animación de inicio
+  let introNodes = [], introBuf = null, songSrc = null, songGain = null, songPlaying = false, introActive = false;
+
+  const BEAT = 60 / 72, EIGHTH = BEAT / 2;
+  const CHORDS = [[57, 60, 64], [53, 57, 60], [48, 52, 55], [55, 59, 62]]; // Am, F, C, G
+  const ROOTS = [33, 29, 36, 31];
+  const ARP = [0, 2, 1, 2, 1, 2, 0, 1];
+  const mtof = (m) => 440 * Math.pow(2, (m - 69) / 12);
+
+  function makeNoise(sec) {
+    const b = ac.createBuffer(1, ac.sampleRate * sec, ac.sampleRate);
+    const d = b.getChannelData(0);
+    for (let i = 0; i < d.length; i++) d[i] = Math.random() * 2 - 1;
+    return b;
+  }
+
+  function init() {
+    if (ac) return;
+    ac = new (window.AudioContext || window.webkitAudioContext)();
+    master = ac.createGain();
+    master.gain.value = enabled ? vol : 0;
+    const comp = ac.createDynamicsCompressor();
+    master.connect(comp); comp.connect(ac.destination);
+    noiseBuf = makeNoise(2);
+
+    // zumbido del plasma
+    humGain = ac.createGain(); humGain.gain.value = 0;
+    humFilter = ac.createBiquadFilter(); humFilter.type = 'lowpass'; humFilter.frequency.value = 150;
+    hum1 = ac.createOscillator(); hum1.type = 'sawtooth'; hum1.frequency.value = 55;
+    hum2 = ac.createOscillator(); hum2.type = 'sawtooth'; hum2.frequency.value = 55.7;
+    hum1.connect(humFilter); hum2.connect(humFilter);
+    humFilter.connect(humGain); humGain.connect(master);
+    hum1.start(); hum2.start();
+
+    // rugido del plasma (ruido filtrado)
+    const nsrc = ac.createBufferSource(); nsrc.buffer = noiseBuf; nsrc.loop = true;
+    noiseFilter = ac.createBiquadFilter(); noiseFilter.type = 'bandpass'; noiseFilter.frequency.value = 300; noiseFilter.Q.value = 0.7;
+    noiseGain = ac.createGain(); noiseGain.gain.value = 0;
+    nsrc.connect(noiseFilter); noiseFilter.connect(noiseGain); noiseGain.connect(master);
+    // vapor del enfriado (mismo ruido, filtro agudo)
+    const steamFilter = ac.createBiquadFilter(); steamFilter.type = 'bandpass'; steamFilter.frequency.value = 3500; steamFilter.Q.value = 0.6;
+    steamGain = ac.createGain(); steamGain.gain.value = 0;
+    nsrc.connect(steamFilter); steamFilter.connect(steamGain); steamGain.connect(master);
+    nsrc.start();
+
+    // sirena de meltdown
+    const sirenOsc = ac.createOscillator(); sirenOsc.type = 'sawtooth'; sirenOsc.frequency.value = 700;
+    const lfo = ac.createOscillator(); lfo.type = 'sine'; lfo.frequency.value = 1.4;
+    const lfoGain = ac.createGain(); lfoGain.gain.value = 280;
+    lfo.connect(lfoGain); lfoGain.connect(sirenOsc.frequency);
+    const sirenFilter = ac.createBiquadFilter(); sirenFilter.type = 'lowpass'; sirenFilter.frequency.value = 2500;
+    sirenGain = ac.createGain(); sirenGain.gain.value = 0;
+    sirenOsc.connect(sirenFilter); sirenFilter.connect(sirenGain); sirenGain.connect(master);
+    sirenOsc.start(); lfo.start();
+
+    startMusic();
+  }
+
+  // ---- música de fondo ----
+  function setupMusicBus() {
+    musicGain = ac.createGain(); musicGain.gain.value = 0;
+    musicLP = ac.createBiquadFilter(); musicLP.type = 'lowpass'; musicLP.frequency.value = 1800;
+    musicLP.connect(musicGain); musicGain.connect(master);
+    // eco para dar espacio
+    const d = ac.createDelay(1.0); d.delayTime.value = 0.42;
+    const fb = ac.createGain(); fb.gain.value = 0.38;
+    const dlp = ac.createBiquadFilter(); dlp.type = 'lowpass'; dlp.frequency.value = 1800;
+    delayIn = ac.createGain(); delayIn.gain.value = 0.5;
+    delayIn.connect(d); d.connect(dlp); dlp.connect(fb); fb.connect(d); dlp.connect(musicLP);
+  }
+  function mnote(midi, start, dur, v, type, attack, send) {
+    const o = ac.createOscillator(), g = ac.createGain();
+    o.type = type; o.frequency.value = mtof(midi);
+    g.gain.setValueAtTime(0.0001, start);
+    g.gain.exponentialRampToValueAtTime(v, start + attack);
+    g.gain.exponentialRampToValueAtTime(0.0001, start + dur);
+    o.connect(g); g.connect(musicLP);
+    if (send) g.connect(delayIn);
+    o.start(start); o.stop(start + dur + 0.1);
+  }
+  function playMusicStep(step, t) {
+    const ci = Math.floor(step / 16) % 4;
+    if (step % 16 === 0) {
+      const dur = EIGHTH * 16;
+      for (const n of CHORDS[ci]) mnote(n, t, dur + 1.5, 0.035, 'triangle', 1.8, false);
+      mnote(ROOTS[ci], t, dur, 0.12, 'sine', 0.05, false);
+      mnote(ROOTS[ci] + 12, t + EIGHTH * 8, dur / 2, 0.05, 'sine', 0.05, false);
+    }
+    if (Math.random() < 0.7) {
+      const note = CHORDS[ci][ARP[step % 8] % 3] + 12;
+      mnote(note, t, 0.9, 0.05, 'triangle', 0.01, true);
+    }
+  }
+  function musicTick() {
+    if (!ac) return;
+    while (nextNote < ac.currentTime + 0.5) {
+      playMusicStep(mstep, nextNote);
+      nextNote += EIGHTH; mstep++;
+    }
+  }
+  function startSynthMusic() {
+    if (musicTimer) return;
+    nextNote = ac.currentTime + 0.2;
+    musicTimer = setInterval(musicTick, 120);
+  }
+  let tracks = [], trackIdx = 0, curSrc = null;
+  async function playTrack(i) {
+    try {
+      const r = await fetch('/musica?f=' + encodeURIComponent(tracks[i]));
+      const audioBuf = await ac.decodeAudioData(await r.arrayBuffer());
+      if (curSrc) { curSrc.onended = null; try { curSrc.stop(); } catch (e) { /* ya parado */ } }
+      const src = ac.createBufferSource();
+      src.buffer = audioBuf;
+      src.connect(musicGain);
+      musicLevel = 0.6;
+      curSrc = src; trackIdx = i;
+      src.onended = () => { if (curSrc === src) playTrack((trackIdx + 1) % tracks.length); };
+      src.start();
+      el.mus.title = '♪ ' + tracks[i].replace(/^musica\//, '').replace(/\.[^.]+$/, '') + '  (' + (i + 1) + '/' + tracks.length + ')';
+    } catch (e) {
+      if (tracks.length > 1) setTimeout(() => playTrack((i + 1) % tracks.length), 500);
+      else startSynthMusic();
+    }
+  }
+  function nextTrack() { if (ac && tracks.length > 1) playTrack((trackIdx + 1) % tracks.length); }
+  function startMusic() {
+    setupMusicBus();
+    loadExplosion();
+    fetch('/musica-info').then((r) => (r.ok ? r.json() : {}))
+      .then((i) => {
+        tracks = (i && i.tracks) || [];
+        if (tracks.length) playTrack(0); else startSynthMusic();
+      })
+      .catch(() => startSynthMusic());
+  }
+
+  function unlock() {
+    init();
+    if (ac.state === 'suspended') ac.resume();
+    refreshBtn();
+  }
+
+  function tone(freq, dur, v, type, when, endFreq) {
+    if (!ac) return;
+    const t = ac.currentTime + (when || 0);
+    const o = ac.createOscillator(), g = ac.createGain();
+    o.type = type || 'sine';
+    o.frequency.setValueAtTime(freq, t);
+    if (endFreq) o.frequency.exponentialRampToValueAtTime(endFreq, t + dur);
+    g.gain.setValueAtTime(0.0001, t);
+    g.gain.exponentialRampToValueAtTime(v, t + 0.012);
+    g.gain.exponentialRampToValueAtTime(0.0001, t + dur);
+    o.connect(g); g.connect(master);
+    o.start(t); o.stop(t + dur + 0.05);
+  }
+  function noiseBurst(dur, v, type, f0, f1, when) {
+    if (!ac) return;
+    const t = ac.currentTime + (when || 0);
+    const src = ac.createBufferSource(); src.buffer = noiseBuf;
+    const flt = ac.createBiquadFilter(); flt.type = type;
+    flt.frequency.setValueAtTime(f0, t);
+    flt.frequency.exponentialRampToValueAtTime(f1, t + dur);
+    const g = ac.createGain();
+    g.gain.setValueAtTime(v, t);
+    g.gain.exponentialRampToValueAtTime(0.0001, t + dur);
+    src.connect(flt); flt.connect(g); g.connect(master);
+    src.start(t); src.stop(t + dur + 0.05);
+  }
+
+  // ---- animación de inicio ----
+  async function prepareIntro() {
+    if (!ac) return false;
+    try {
+      const info = await (await fetch('/inicio-info')).json();
+      if (!info || !info.file) return false;
+      const r = await fetch('/inicio');
+      introBuf = await ac.decodeAudioData(await r.arrayBuffer());
+      return !!introBuf;
+    } catch (e) { introBuf = null; return false; }
+  }
+  // sonido de arranque sintético (solo si no hay inicio.mp3): zumbido que sube, riser, estallido y rugido
+  function introSynth() {
+    const t = ac.currentTime;
+    // los tiempos del sonido siguen los de la intro: cuenta regresiva (0-20) e ignición (20-30)
+    const ph = (x) => (x <= 20 ? x * (T_COUNT / 20) : T_COUNT + (x - 20));
+    const out = ac.createGain(); out.gain.value = 1; out.connect(master); introNodes.push(out);
+
+    const o = ac.createOscillator(); o.type = 'sawtooth';
+    o.frequency.setValueAtTime(38, t); o.frequency.exponentialRampToValueAtTime(110, t + ph(20));
+    const lp = ac.createBiquadFilter(); lp.type = 'lowpass';
+    lp.frequency.setValueAtTime(200, t); lp.frequency.exponentialRampToValueAtTime(1500, t + ph(20));
+    const g = ac.createGain();
+    g.gain.setValueAtTime(0.0001, t);
+    g.gain.exponentialRampToValueAtTime(0.16, t + ph(19.5));
+    g.gain.exponentialRampToValueAtTime(0.0001, t + ph(20.4));
+    o.connect(lp); lp.connect(g); g.connect(out); o.start(t); o.stop(t + ph(21));
+
+    const ns = ac.createBufferSource(); ns.buffer = noiseBuf; ns.loop = true;
+    const bp = ac.createBiquadFilter(); bp.type = 'bandpass'; bp.Q.value = 0.8;
+    bp.frequency.setValueAtTime(300, t + ph(12)); bp.frequency.exponentialRampToValueAtTime(5000, t + ph(20));
+    const ng = ac.createGain();
+    ng.gain.setValueAtTime(0.0001, t);
+    ng.gain.setValueAtTime(0.0001, t + ph(12));
+    ng.gain.exponentialRampToValueAtTime(0.3, t + ph(19.8));
+    ng.gain.exponentialRampToValueAtTime(0.0001, t + ph(20.3));
+    ns.connect(bp); bp.connect(ng); ng.connect(out); ns.start(t); ns.stop(t + ph(21));
+
+    // rugido de la ignición (20 a 30 s)
+    const r = ac.createOscillator(); r.type = 'sawtooth';
+    r.frequency.setValueAtTime(45, t + ph(20)); r.frequency.linearRampToValueAtTime(70, t + ph(27));
+    const rlp = ac.createBiquadFilter(); rlp.type = 'lowpass';
+    rlp.frequency.setValueAtTime(180, t + ph(20));
+    rlp.frequency.exponentialRampToValueAtTime(1400, t + ph(26));
+    rlp.frequency.exponentialRampToValueAtTime(200, t + ph(30));
+    const rg = ac.createGain();
+    rg.gain.setValueAtTime(0.0001, t + ph(20));
+    rg.gain.exponentialRampToValueAtTime(0.22, t + ph(22));
+    rg.gain.exponentialRampToValueAtTime(0.0001, t + ph(30));
+    r.connect(rlp); rlp.connect(rg); rg.connect(out); r.start(t + ph(20)); r.stop(t + ph(31));
+
+    const rn = ac.createBufferSource(); rn.buffer = noiseBuf; rn.loop = true;
+    const rnf = ac.createBiquadFilter(); rnf.type = 'lowpass';
+    rnf.frequency.setValueAtTime(300, t + ph(20));
+    rnf.frequency.exponentialRampToValueAtTime(2000, t + ph(25));
+    rnf.frequency.exponentialRampToValueAtTime(300, t + ph(30));
+    const rng = ac.createGain();
+    rng.gain.setValueAtTime(0.0001, t + ph(20));
+    rng.gain.exponentialRampToValueAtTime(0.2, t + ph(24));
+    rng.gain.exponentialRampToValueAtTime(0.0001, t + ph(30));
+    rn.connect(rnf); rnf.connect(rng); rng.connect(out); rn.start(t + ph(20)); rn.stop(t + ph(31));
+  }
+  function introStart(hasSong) {
+    if (!ac) return;
+    if (hasSong && introBuf) {
+      songSrc = ac.createBufferSource(); songSrc.buffer = introBuf;
+      songGain = ac.createGain(); songGain.gain.value = 1;
+      songSrc.connect(songGain); songGain.connect(master);
+      songPlaying = true;
+      songSrc.onended = () => { songPlaying = false; };
+      songSrc.start();
+    } else {
+      introSynth();
+    }
+  }
+  function introStop() {
+    if (!ac) return;
+    for (const n of introNodes) n.gain.setTargetAtTime(0, ac.currentTime, 0.1);
+    if (songGain) {
+      songGain.gain.setTargetAtTime(0, ac.currentTime, 0.15);
+      try { songSrc.stop(ac.currentTime + 0.8); } catch (e) { /* ya terminó */ }
+    }
+    songPlaying = false;
+  }
+  function introTube() {
+    tone(80, 0.22, 0.5, 'sine', 0, 40);
+    noiseBurst(0.12, 0.3, 'lowpass', 2500, 300, 0);
+    tone(1800, 0.05, 0.12, 'square', 0);
+    tone(1320, 0.09, 0.1, 'sine', 0.08);
+  }
+  function introTick() { tone(900, 0.07, 0.1, 'triangle', 0); }
+  function introIgnite(hasSong) {
+    const k = hasSong ? 0.5 : 1;
+    tone(70, 2.0, 0.6 * k, 'sine', 0, 28);
+    noiseBurst(1.6, 0.6 * k, 'lowpass', 5000, 120, 0);
+    noiseBurst(0.4, 0.3 * k, 'highpass', 3000, 9000, 0);
+  }
+  function setIntroActive(v) { introActive = v; }
+
+  // ---- sonidos de contratos y eventos (cortos y suaves) ----
+  function sfx(name) {
+    if (!ac || !enabled) return;
+    switch (name) {
+      case 'mission-new':
+        tone(520, 0.12, 0.1, 'triangle', 0);
+        tone(780, 0.18, 0.1, 'triangle', 0.13);
+        break;
+      case 'mission-ok':
+        [523, 659, 784, 1047].forEach((fq, i) => tone(fq, 0.28, 0.1, 'triangle', i * 0.11));
+        tone(1568, 0.6, 0.06, 'sine', 0.45);
+        break;
+      case 'mission-fail':
+        tone(330, 0.25, 0.12, 'sawtooth', 0, 220);
+        tone(220, 0.4, 0.12, 'sawtooth', 0.25, 110);
+        break;
+      case 'repair-start':
+        tone(700, 0.05, 0.1, 'square', 0);
+        tone(520, 0.05, 0.1, 'square', 0.14);
+        tone(700, 0.05, 0.1, 'square', 0.28);
+        noiseBurst(0.15, 0.1, 'bandpass', 2000, 800, 0.28);
+        break;
+      case 'repair-ok':
+        tone(660, 0.18, 0.1, 'triangle', 0);
+        tone(990, 0.35, 0.1, 'triangle', 0.14);
+        break;
+      case 'ev-meteors':
+        noiseBurst(1.4, 0.2, 'bandpass', 3000, 400, 0);
+        tone(70, 1.2, 0.2, 'sine', 0.1, 35);
+        break;
+      case 'impact':
+        tone(90, 0.25, 0.22, 'sine', 0, 40);
+        noiseBurst(0.2, 0.2, 'lowpass', 2500, 150, 0);
+        tone(1400, 0.06, 0.06, 'square', 0);
+        break;
+      case 'ev-summer':
+        tone(110, 1.6, 0.16, 'sine', 0, 220);
+        noiseBurst(1.4, 0.1, 'bandpass', 600, 2500, 0);
+        break;
+      case 'ev-winter':
+        [1568, 1976, 2349, 2637].forEach((fq, i) => tone(fq, 0.9, 0.05, 'sine', i * 0.14));
+        noiseBurst(1.2, 0.06, 'highpass', 5000, 9000, 0);
+        break;
+      case 'ev-storm':
+        noiseBurst(1.6, 0.3, 'lowpass', 3000, 90, 0);
+        tone(55, 1.5, 0.28, 'sine', 0.05, 30);
+        break;
+      case 'thunder':
+        noiseBurst(1.2, 0.18, 'lowpass', 1800, 80, 0.25);
+        break;
+      case 'ev-pump':
+      case 'ev-pump2':
+        tone(180, 0.14, 0.22, 'square', 0);
+        tone(150, 0.14, 0.22, 'square', 0.2);
+        tone(120, 0.5, 0.22, 'sawtooth', 0.4, 60);
+        noiseBurst(0.5, 0.15, 'bandpass', 900, 200, 0.4);
+        break;
+      case 'ev-demand':
+        tone(880, 0.1, 0.08, 'square', 0);
+        tone(1175, 0.1, 0.08, 'square', 0.12);
+        tone(1568, 0.3, 0.08, 'square', 0.24);
+        break;
+      case 'ev-pulse':
+        noiseBurst(0.35, 0.3, 'highpass', 1000, 9000, 0);
+        tone(1800, 0.4, 0.14, 'sawtooth', 0, 90);
+        break;
+    }
+  }
+
+  // ---- eventos puntuales ----
+  function ignite() {
+    tone(1500, 0.03, 0.15, 'square', 0);
+    tone(1100, 0.03, 0.15, 'square', 0.15);
+    tone(60, 1.4, 0.25, 'sawtooth', 0.1, 420);
+    noiseBurst(1.3, 0.22, 'bandpass', 200, 3500, 0.1);
+    tone(660, 0.3, 0.12, 'sine', 1.35);
+    tone(990, 0.45, 0.12, 'sine', 1.5);
+  }
+  function scram() {
+    tone(120, 0.14, 0.4, 'square', 0);
+    noiseBurst(0.18, 0.4, 'lowpass', 2500, 200, 0);
+    tone(500, 1.1, 0.22, 'sawtooth', 0.05, 40);
+    tone(600, 0.1, 0.15, 'square', 0.25);
+    tone(600, 0.1, 0.15, 'square', 0.45);
+  }
+  function meltdown() {
+    // aviso de inicio de la cuenta: grave y corto (la explosión viene 2:10 después)
+    tone(90, 1.4, 0.4, 'sine', 0, 30);
+    noiseBurst(1.2, 0.35, 'lowpass', 4000, 150, 0);
+    for (let i = 0; i < 3; i++) tone(600, 0.14, 0.08, 'triangle', 0.3 + i * 0.25);
+  }
+  function cooldownStart() {
+    tone(300, 2.2, 0.2, 'sawtooth', 0, 30);
+    noiseBurst(2.2, 0.3, 'bandpass', 4500, 700, 0);
+  }
+  // explosión del reactor: estruendo + música dramática (tu archivo explosion.mp3 si existe)
+  let explosionBuf = null;
+  function loadExplosion() {
+    fetch('/explosion-info').then((r) => r.json()).then((i) => {
+      if (!i || !i.file) return null;
+      return fetch('/explosion').then((r) => r.arrayBuffer()).then((b) => ac.decodeAudioData(b));
+    }).then((b) => { if (b) explosionBuf = b; }).catch(() => {});
+  }
+  function explosion() {
+    if (!ac) return;
+    tone(130, 3.8, 0.9, 'sine', 0, 22);
+    tone(60, 3.0, 0.5, 'sawtooth', 0.04, 20);
+    noiseBurst(5.0, 0.9, 'lowpass', 9000, 60, 0);
+    noiseBurst(0.7, 0.55, 'highpass', 2500, 9000, 0);
+    for (let i = 0; i < 9; i++) noiseBurst(0.16, 0.25, 'bandpass', 2400 + Math.random() * 1500, 500, 0.5 + i * 0.32 + Math.random() * 0.2);
+    if (explosionBuf) {
+      const src = ac.createBufferSource(); src.buffer = explosionBuf;
+      const g = ac.createGain(); g.gain.value = 0.9;
+      src.connect(g); g.connect(master); src.start();
+      return;
+    }
+    // música: acorde grave que cae y melodía triste en la menor
+    [110, 130.8, 164.8].forEach((f, i) => tone(f, 4.5, 0.14, 'sawtooth', 0.9 + i * 0.05, f * 0.7));
+    [[440, 1.6], [392, 2.2], [329.6, 2.8], [349.2, 3.4], [329.6, 4.0], [261.6, 4.7], [293.7, 5.4], [220, 6.2]].forEach(([f, w]) => {
+      tone(f, 1.2, 0.09, 'triangle', w);
+      tone(f / 2, 1.4, 0.05, 'sine', w);
+    });
+  }
+  function ready() {
+    tone(523, 0.35, 0.12, 'sine', 0);
+    tone(659, 0.35, 0.12, 'sine', 0.18);
+    tone(784, 0.6, 0.12, 'sine', 0.36);
+  }
+
+  function onChange(p, c) {
+    if (!ac) return;
+    if (p.phase === 'NORMAL' && c.phase === 'NORMAL') {
+      if (!p.ignited && c.ignited) ignite();
+      if (p.ignited && !c.ignited) scram();
+    }
+    if (p.phase !== 'MELTDOWN' && c.phase === 'MELTDOWN') meltdown();
+    if (p.phase === 'MELTDOWN' && c.phase === 'COOLDOWN') explosion();
+    if (p.phase === 'COOLDOWN' && c.phase === 'NORMAL') ready();
+  }
+
+  // ---- sonido continuo (se llama en cada frame) ----
+  function update(S, f) {
+    if (!ac || !enabled) return;
+    const t = ac.currentTime;
+    const melt = S.phase === 'MELTDOWN', cool = S.phase === 'COOLDOWN';
+    const mk = melt ? Math.min(1, S.phaseTime / (S.meltSeconds || 130)) : 0;
+    let hg = 0.012, hf = 45, filt = 100, ng = 0, nf = 300;
+    if (melt) { hg = 0.08 + 0.14 * mk; hf = 40 + 20 * mk; filt = 300 + 600 * mk; ng = 0.08 + 0.27 * mk; nf = 500 + 700 * mk; }
+    else if (cool) { hg = 0.02 + f * 0.08; hf = 45 + f * 40; filt = 120 + f * 500; ng = 0.01 + f * 0.08; nf = 200 + f * 800; }
+    else if (S.ignited) { hg = 0.07 + f * 0.12; hf = 50 + f * 60; filt = 180 + f * 900; ng = 0.02 + f * 0.16; nf = 250 + f * 1800; }
+    humGain.gain.setTargetAtTime(hg, t, 0.15);
+    hum1.frequency.setTargetAtTime(hf, t, 0.3);
+    hum2.frequency.setTargetAtTime(hf * 1.012, t, 0.3);
+    humFilter.frequency.setTargetAtTime(filt, t, 0.2);
+    noiseGain.gain.setTargetAtTime(ng, t, 0.2);
+    noiseFilter.frequency.setTargetAtTime(nf, t, 0.2);
+    sirenGain.gain.setTargetAtTime(0, t, 0.05);
+    steamGain.gain.setTargetAtTime(cool ? 0.015 + f * 0.07 : 0, t, 0.4);
+
+    // música: callada durante la intro y mientras suene tu canción; se baja en el meltdown
+    if (musicGain) {
+      const allow = !introActive && !songPlaying;
+      const mt = (musicOn && allow) ? (melt ? 0.35 * (1 - mk) : (cool ? 0.3 : 1)) * musicLevel : 0;
+      musicGain.gain.setTargetAtTime(mt, t, melt ? 0.1 : 0.8);
+      musicLP.frequency.setTargetAtTime(1200 + f * 2500, t, 0.5);
+    }
+
+    // alarma de temperatura crítica: 3 pitidos suaves cada tanto (más seguido cuanto más caliente)
+    if (!melt && !cool && S.ignited && S.temp > 200000) {
+      const k = Math.min(1, (S.temp - 200000) / 300000);
+      const gap = 4 - 2.5 * k;
+      if (t - lastBeep > gap) {
+        lastBeep = t;
+        for (let i = 0; i < 3; i++) tone(700 + k * 300, 0.1, 0.07, 'triangle', i * 0.18);
+      }
+    }
+    // cuenta regresiva de la explosión: pitidos suaves que se aceleran + latido grave
+    if (melt) {
+      const gap = Math.max(0.45, 3 - 2.55 * mk);
+      if (t - lastBeep > gap) {
+        lastBeep = t;
+        tone(620 + 380 * mk, 0.12, 0.05 + 0.04 * mk, 'triangle', 0);
+        if (mk > 0.4) tone(62, 0.3, 0.1 + 0.1 * mk, 'sine', 0.06, 36);
+      }
+    }
+    // tic-tac del metal enfriándose
+    if (cool && Math.random() < 0.02 * f) {
+      tone(1200 + Math.random() * 800, 0.05, 0.04, 'triangle', 0);
+    }
+  }
+
+  function setVol(v) {
+    vol = v;
+    if (ac) master.gain.setTargetAtTime(enabled ? vol : 0, ac.currentTime, 0.05);
+  }
+  function toggle() {
+    if (!ac) { enabled = true; unlock(); return; }
+    enabled = !enabled;
+    master.gain.setTargetAtTime(enabled ? vol : 0, ac.currentTime, 0.05);
+    refreshBtn();
+  }
+  function toggleMusic() {
+    if (!ac) { unlock(); return; }
+    musicOn = !musicOn;
+    refreshBtn();
+  }
+  function refreshBtn() {
+    if (!ac) { el.snd.textContent = '🔇 ACTIVAR SONIDO'; el.snd.className = ''; }
+    else if (enabled) { el.snd.textContent = '🔊 SONIDO'; el.snd.className = 'on'; }
+    else { el.snd.textContent = '🔇 SONIDO'; el.snd.className = ''; }
+    el.mus.textContent = '♪ MÚSICA';
+    el.mus.className = (ac && enabled && musicOn) ? 'on' : '';
+  }
+  return {
+    unlock, onChange, update, setVol, toggle, toggleMusic, nextTrack, refreshBtn,
+    prepareIntro, introStart, introStop, introTube, introTick, introIgnite, introDone: ready, setIntroActive, sfx,
+  };
+})();
+
+// El audio se habilita desde los controles de sonido o al iniciar la ignición.
+el.snd.addEventListener('click', () => Snd.toggle());
+el.mus.addEventListener('click', () => Snd.toggleMusic());
+el.vol.addEventListener('input', () => Snd.setVol(el.vol.value / 100));
+Snd.refreshBtn();
+
+// ---------- canvas ----------
+const RB = { box: $('rebuild'), fill: $('rbFill'), time: $('rbTime') };
+let explode = null, meltSaid = 0;
+let W = 0, H = 0, topH = 90, botH = 100, frameCount = 0, DPR = 1, bgKey = '';
+const bgc = document.createElement('canvas');
+function resize() {
+  const dpr = Math.min(window.devicePixelRatio || 1, 2);
+  DPR = dpr;
+  const r = cv.getBoundingClientRect();
+  W = r.width; H = r.height;
+  cv.width = W * dpr; cv.height = H * dpr;
+  ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+  ctx.fillStyle = '#05060a'; ctx.fillRect(0, 0, W, H);
+  fx.width = W * dpr; fx.height = H * dpr;
+  fctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+  bgKey = '';
+  measure();
+}
+function measure() {
+  topH = el.top.offsetHeight; botH = el.bottom.offsetHeight;
+  el.alert.style.top = (topH + 12) + 'px';
+  el.intromsg.style.bottom = (botH + 14) + 'px';
+  el.missions.style.top = (topH + 10) + 'px';
+  el.evBanner.style.top = (el.missions.offsetTop + el.missions.offsetHeight + 8) + 'px';
+  el.toasts.style.top = (topH + 10) + 'px';
+  RB.box.style.top = topH + 'px';
+  buildBackdrop();
+}
+addEventListener('resize', resize);
+resize();
+
+// ---------- fondo espacial ----------
+// Se dibuja una sola vez en un canvas aparte y la estela del reactor se desvanece hacia él.
+function buildBackdrop() {
+  const key = W + 'x' + H + ':' + topH + ':' + botH;
+  if (key === bgKey || !W || !H) return;
+  bgKey = key;
+  bgc.width = Math.round(W * DPR); bgc.height = Math.round(H * DPR);
+  const g = bgc.getContext('2d');
+  g.setTransform(DPR, 0, 0, DPR, 0, 0);
+  let seed = 1234567;
+  const rand = () => { seed = (seed * 1664525 + 1013904223) >>> 0; return seed / 4294967296; };
+
+  // cielo
+  const sky = g.createLinearGradient(0, 0, 0, H);
+  sky.addColorStop(0, '#04060f'); sky.addColorStop(0.55, '#070817'); sky.addColorStop(1, '#0b0719');
+  g.fillStyle = sky; g.fillRect(0, 0, W, H);
+
+  // nebulosas
+  const big = Math.max(W, H);
+  const blobs = [[0.18, 0.28, 0.55, '110,60,210', 0.20], [0.86, 0.72, 0.5, '30,170,210', 0.15], [0.62, 0.12, 0.35, '220,60,150', 0.10], [0.4, 0.95, 0.4, '60,90,230', 0.12]];
+  for (const [bx, by, br, col, a] of blobs) {
+    const rg = g.createRadialGradient(bx * W, by * H, 0, bx * W, by * H, br * big);
+    rg.addColorStop(0, 'rgba(' + col + ',' + a + ')'); rg.addColorStop(1, 'rgba(' + col + ',0)');
+    g.fillStyle = rg; g.fillRect(0, 0, W, H);
+  }
+
+  // estrellas
+  for (let i = 0; i < 280; i++) {
+    const x = rand() * W, y = rand() * H, r = 0.3 + rand() * rand() * 1.6, a = 0.25 + rand() * 0.7, c = rand();
+    g.fillStyle = c < 0.15 ? 'rgba(255,200,160,' + a + ')' : (c < 0.3 ? 'rgba(160,200,255,' + a + ')' : 'rgba(235,240,255,' + a + ')');
+    g.beginPath(); g.arc(x, y, r, 0, 6.2832); g.fill();
+  }
+
+  // planeta gigante abajo a la izquierda
+  const pr = Math.min(W, H) * 0.42, px = W * 0.02, py = H * 1.02;
+  const pg = g.createRadialGradient(px + pr * 0.35, py - pr * 0.45, pr * 0.1, px, py, pr);
+  pg.addColorStop(0, '#1b3a63'); pg.addColorStop(0.6, '#0c1a33'); pg.addColorStop(1, '#050913');
+  g.fillStyle = pg; g.beginPath(); g.arc(px, py, pr, 0, 6.2832); g.fill();
+  g.lineWidth = 2; g.strokeStyle = 'rgba(90,200,255,0.35)';
+  g.beginPath(); g.arc(px, py, pr, -1.35, -0.25); g.stroke();
+  g.lineWidth = 8; g.strokeStyle = 'rgba(90,200,255,0.07)';
+  g.beginPath(); g.arc(px, py, pr + 3, -1.35, -0.25); g.stroke();
+
+  // rejilla de plano técnico
+  g.lineWidth = 1; g.strokeStyle = 'rgba(80,150,210,0.045)';
+  for (let x = 0; x < W; x += 64) { g.beginPath(); g.moveTo(x, 0); g.lineTo(x, H); g.stroke(); }
+  for (let y = 0; y < H; y += 64) { g.beginPath(); g.moveTo(0, y); g.lineTo(W, y); g.stroke(); }
+
+  // anillos de la estación alrededor del reactor
+  const regionH = Math.max(120, H - topH - botH);
+  const cx = W / 2, cy = topH + regionH / 2, R = Math.min(W, regionH) * 0.31;
+  g.strokeStyle = 'rgba(90,210,255,0.10)'; g.lineWidth = 1;
+  for (const k of [1.55, 2.1]) { g.beginPath(); g.arc(cx, cy, R * k, 0, 6.2832); g.stroke(); }
+  g.setLineDash([4, 10]); g.beginPath(); g.arc(cx, cy, R * 2.7, 0, 6.2832); g.stroke(); g.setLineDash([]);
+  for (let i = 0; i < 72; i++) {
+    const a = i / 72 * 6.2832, l = i % 6 === 0 ? 12 : 5, r0 = R * 2.1;
+    g.beginPath();
+    g.moveTo(cx + Math.cos(a) * r0, cy + Math.sin(a) * r0);
+    g.lineTo(cx + Math.cos(a) * (r0 + l), cy + Math.sin(a) * (r0 + l));
+    g.stroke();
+  }
+
+  // viñeta
+  const vg = g.createRadialGradient(W / 2, H / 2, Math.min(W, H) * 0.45, W / 2, H / 2, Math.max(W, H) * 0.8);
+  vg.addColorStop(0, 'rgba(0,0,0,0)'); vg.addColorStop(1, 'rgba(0,0,0,0.5)');
+  g.fillStyle = vg; g.fillRect(0, 0, W, H);
+
+  ctx.drawImage(bgc, 0, 0, W, H);
+}
+
+// ---------- animación de inicio ----------
+// 0-27 s: se conectan 4 tubos de inyección y 2 de refrigerante, con cuenta regresiva.
+// 27-37 s: ignición: tubos amarillo neón y movimiento de cámara. A los 37 s se habilitan los controles.
+const T_COUNT = 27, T_END = 37, TUBE_DUR = 2.0;
+const PORTS = [
+  { ang: -Math.PI / 4, kind: 'main' },      // arriba derecha
+  { ang: -3 * Math.PI / 4, kind: 'main' },  // arriba izquierda
+  { ang: 3 * Math.PI / 4, kind: 'main' },   // abajo izquierda
+  { ang: Math.PI / 4, kind: 'main' },       // abajo derecha
+  { ang: -Math.PI / 2, kind: 'cool' },      // refrigerante superior
+  { ang: Math.PI / 2, kind: 'cool' },       // refrigerante inferior
+];
+const TUBE_START = [3, 6, 9, 12, 17, 20];
+const TUBE_NAMES = ['INYECCIÓN 1/4', 'INYECCIÓN 2/4', 'INYECCIÓN 3/4', 'INYECCIÓN 4/4', 'REFRIGERANTE SUPERIOR', 'REFRIGERANTE INFERIOR'];
+
+const Intro = { state: 'wait', t0: 0, T: 0, hasSong: false, done: true }; // wait | loading | run | done
+const conn = PORTS.map(() => false);
+const flashAt = PORTS.map(() => -99);
+let lastTick = -1, igniteDone = false, lastMsg = '';
+
+function smooth(x) { x = Math.max(0, Math.min(1, x)); return x * x * (3 - 2 * x); }
+function lerp(a, b, k) { return a + (b - a) * k; }
+
+function introMsg(T) {
+  if (T >= T_END) return '';
+  if (T >= T_COUNT) return 'IGNICIÓN EN CURSO';
+  let idx = -1;
+  for (let i = 0; i < PORTS.length; i++) if (T >= TUBE_START[i]) idx = i;
+  if (idx < 0) return 'INICIANDO SECUENCIA DE ARRANQUE';
+  const connected = T >= TUBE_START[idx] + TUBE_DUR;
+  if (idx === PORTS.length - 1 && connected) return 'PRESURIZANDO SISTEMA';
+  return (connected ? 'CONECTADO: ' : 'CONECTANDO: ') + TUBE_NAMES[idx];
+}
+function neonAmount(T) {
+  if (T < T_COUNT || T >= T_END) return 0;
+  if (T < T_COUNT + 1.2) return smooth((T - T_COUNT) / 1.2);
+  if (T < T_END - 1) return 1;
+  return smooth((T_END - T) / 1);
+}
+function camera(T) {
+  if (T < 0 || T >= T_END) return { z: 1, rot: 0, x: 0, y: 0, sh: 0 };
+  if (T < T_COUNT) {
+    return { z: 1 + 0.06 * smooth((T - T_COUNT * 0.4) / (T_COUNT * 0.6)), rot: 0, x: 0, y: 0, sh: T > T_COUNT - 3 ? (T - (T_COUNT - 3)) / 3 * 1.5 : 0 };
+  }
+  const u = (T - T_COUNT) / (T_END - T_COUNT);
+  const bump = Math.pow(Math.sin(Math.PI * u), 1.2);
+  return {
+    z: 1.06 - 0.06 * smooth(u) + 0.5 * bump,
+    rot: 0.06 * Math.sin(2 * Math.PI * u),
+    x: 40 * Math.sin(2 * Math.PI * u) * bump,
+    y: -25 * Math.sin(2 * Math.PI * u) * bump,
+    sh: 7 * bump,
+  };
+}
+function introVisuals(T) {
+  if (T < T_COUNT) {
+    const a = T / T_COUNT;
+    const pulse = 0.5 + 0.5 * Math.sin(T * (2 + a * 8));
+    return { f: 0.05 + 0.2 * a * a, inten: 0.07 + 0.28 * a * a + 0.04 * pulse * a };
+  }
+  const u = (T - T_COUNT) / (T_END - T_COUNT);
+  if (u < 0.7) {
+    const s = smooth(u / 0.7);
+    return { f: lerp(0.25, 0.7, s), inten: lerp(0.35, 1.5, s) };
+  }
+  const s = smooth((u - 0.7) / 0.3);
+  return { f: lerp(0.7, 0, s), inten: lerp(1.5, 0.07, s) };
+}
+function portP(i, T) {
+  if (Intro.state === 'done') return 1;
+  if (Intro.state !== 'run') return 0;
+  return Math.max(0, Math.min(1, (T - TUBE_START[i]) / TUBE_DUR));
+}
+function resetIntroFlags() {
+  for (let i = 0; i < PORTS.length; i++) { conn[i] = false; flashAt[i] = -99; }
+  lastTick = -1; igniteDone = false; lastMsg = '';
+}
+function checkStartupRequirements() {
+  const racks = S.servers || { compute:false, storage:false, network:false };
+  const serverCount = ['compute','storage','network'].filter(k => !!racks[k]).length;
+  if (serverCount < 3) {
+    showRequirementMessage('REQUISITO PENDIENTE: encendé los 3 servidores en SISTEMAS PRINCIPALES.');
+    return false;
+  }
+  const coolantOn = Number(S.coolant) > 0;
+  const fuelOn = Number(S.fuel) > 0;
+  if (!coolantOn || !fuelOn) {
+    const missing = !coolantOn && !fuelOn ? 'las dos bombas' : (!coolantOn ? 'la bomba de refrigerante' : 'la bomba de recirculación');
+    showRequirementMessage('REQUISITO PENDIENTE: encendé ' + missing + ' en SISTEMAS PRINCIPALES.');
+    return false;
+  }
+  return true;
+}
+
+async function introBegin() {
+  if (Intro.state === 'loading' || Intro.state === 'run' || S.ignited || S.phase !== 'NORMAL') return;
+  if (!checkStartupRequirements()) return;
+  Intro.state = 'loading';
+  Intro.done = false;
+  el.ign.disabled = true;
+  el.ign.textContent = 'PREPARANDO...';
+  syncUI();
+  Snd.setIntroActive(true);
+  Snd.unlock();
+  let hasSong = false;
+  try { hasSong = await Snd.prepareIntro(); } catch (e) { hasSong = false; }
+  resetIntroFlags();
+  el.skip.style.display = 'block';
+  Intro.hasSong = hasSong;
+  Intro.t0 = performance.now();
+  Intro.T = 0;
+  Intro.state = 'run';
+  Snd.introStart(hasSong);
+  syncUI();
+}
+function introFinish(skipped) {
+  if (Intro.state !== 'run' && Intro.state !== 'loading') return;
+  Intro.state = 'done'; Intro.done = true; Intro.T = T_END;
+  el.skip.style.display = 'none';
+  el.count.textContent = ''; el.intromsg.textContent = '';
+  Snd.setIntroActive(false);
+  Snd.introStop();
+  if (!skipped) Snd.introDone();
+  send({ type: 'ignite' });
+  syncUI();
+}
+function introTriggers(T) {
+  for (let i = 0; i < PORTS.length; i++) {
+    if (!conn[i] && T >= TUBE_START[i] + TUBE_DUR) { conn[i] = true; flashAt[i] = T; Snd.introTube(); }
+  }
+  if (T < T_COUNT) {
+    const n = Math.ceil(T_COUNT - T);
+    if (!Intro.hasSong && n <= 5 && n !== lastTick) { lastTick = n; Snd.introTick(); }
+    el.count.textContent = String(n);
+    el.count.style.color = n <= 5 ? '#ff6b6b' : '#cfe3ff';
+  } else {
+    el.count.textContent = '';
+    if (!igniteDone) { igniteDone = true; Snd.introIgnite(Intro.hasSong); }
+  }
+  const msg = introMsg(T);
+  if (msg !== lastMsg) { lastMsg = msg; el.intromsg.textContent = msg; }
+  el.intromsg.style.color = T >= T_COUNT ? '#fff200' : '#8fb4ff';
+}
+el.skip.addEventListener('click', () => introFinish(true));
+
+// ---------- estructura: anillo, tanques y tubos ----------
+function seg(x0, y0, x1, y1) { ctx.beginPath(); ctx.moveTo(x0, y0); ctx.lineTo(x1, y1); ctx.stroke(); }
+function glowLine(x0, y0, x1, y1, w, neon) {
+  ctx.save();
+  ctx.globalCompositeOperation = 'lighter';
+  ctx.lineCap = 'round';
+  ctx.lineWidth = w * 2.4; ctx.strokeStyle = `rgba(255,230,0,${0.14 * neon})`; seg(x0, y0, x1, y1);
+  ctx.lineWidth = w * 1.3; ctx.strokeStyle = `rgba(255,240,40,${0.3 * neon})`; seg(x0, y0, x1, y1);
+  ctx.lineWidth = Math.max(2, w * 0.45); ctx.strokeStyle = `rgba(255,255,160,${0.95 * neon})`; seg(x0, y0, x1, y1);
+  ctx.restore();
+}
+function portDist(th, R, tw, Rc, regionH) {
+  const c = Math.abs(Math.cos(th)), s = Math.abs(Math.sin(th));
+  const mx = W / 2 - 16, my = regionH / 2 - 16;
+  let d = Math.min(c > 1e-3 ? mx / c : 1e9, s > 1e-3 ? my / s : 1e9);
+  d = Math.min(d, R * 3.4);
+  return Math.max(d, Rc + tw * 2.6);
+}
+function drawPort(i, cx, cy, R, tw, Rc, regionH, T, neon, time) {
+  const port = PORTS[i], th = port.ang;
+  const ux = Math.cos(th), uy = Math.sin(th), px = -uy, py = ux;
+  const isCool = port.kind === 'cool';
+  const Dt = portDist(th, R, tw, Rc, regionH);
+  const rt0 = Dt - tw * 1.6;
+  const p = portP(i, T), e = 1 - Math.pow(1 - p, 3);
+  const rStart = rt0 - 0.4 * (rt0 - Rc);
+  const rh = rStart + (Rc - rStart) * e;
+  const x0 = cx + ux * rt0, y0 = cy + uy * rt0, x1 = cx + ux * rh, y1 = cy + uy * rh;
+  const wp = tw * (isCool ? 0.62 : 0.5);
+  const outer = isCool ? '#1f5568' : '#2a3750', fill = isCool ? '#0c1f2b' : '#121826';
+  const Rs = Rc + tw * 0.9;
+
+  // collar sobre el anillo de contención
+  ctx.lineCap = 'butt';
+  ctx.lineWidth = 12; ctx.strokeStyle = outer;
+  ctx.beginPath(); ctx.arc(cx, cy, Rs, th - 0.1, th + 0.1); ctx.stroke();
+
+  // cuerpo del tubo
+  ctx.lineWidth = wp + 8; ctx.strokeStyle = outer; seg(x0, y0, x1, y1);
+  ctx.lineWidth = wp; ctx.strokeStyle = fill; seg(x0, y0, x1, y1);
+  ctx.lineWidth = 2; ctx.strokeStyle = 'rgba(160,190,230,0.22)';
+  seg(x0 + px * wp * 0.25, y0 + py * wp * 0.25, x1 + px * wp * 0.25, y1 + py * wp * 0.25);
+  // bridas
+  ctx.lineWidth = 4; ctx.strokeStyle = outer;
+  const len = rt0 - rh;
+  for (let s = 0; s <= len; s += tw * 1.1) {
+    const r = rh + s, bx = cx + ux * r, by = cy + uy * r;
+    seg(bx + px * (wp / 2 + 7), by + py * (wp / 2 + 7), bx - px * (wp / 2 + 7), by - py * (wp / 2 + 7));
+  }
+  // acople en la punta
+  ctx.lineWidth = 9; ctx.strokeStyle = p >= 1 ? '#6f86ad' : '#3a4a68';
+  seg(x1 + px * (wp / 2 + 9), y1 + py * (wp / 2 + 9), x1 - px * (wp / 2 + 9), y1 - py * (wp / 2 + 9));
+
+  // flujo por el tubo (solo con la intro terminada y el tubo conectado)
+  if (Intro.done && p >= 1 && neon < 0.01) {
+    const pct = isCool
+      ? (S.phase === 'NORMAL' ? S.coolant / 100 : 0)
+      : (S.ignited && S.phase !== 'COOLDOWN' ? S.fuel / 100 : 0);
+    if (pct > 0.02) {
+      ctx.save();
+      ctx.setLineDash([10, 16]);
+      ctx.lineDashOffset = -time * (30 + pct * 160);
+      ctx.lineWidth = wp * 0.32; ctx.lineCap = 'butt';
+      ctx.strokeStyle = isCool ? 'rgba(120,220,255,0.75)' : plasmaColor(0.45, 0.8);
+      seg(x0, y0, x1, y1);
+      ctx.restore();
+    }
+  }
+
+  // tanque
+  ctx.save();
+  ctx.translate(cx + ux * (Dt - tw * 0.8), cy + uy * (Dt - tw * 0.8));
+  ctx.rotate(th);
+  ctx.fillStyle = fill; ctx.fillRect(-tw * 0.8, -tw * 0.7, tw * 1.6, tw * 1.4);
+  ctx.lineWidth = 2; ctx.strokeStyle = outer; ctx.strokeRect(-tw * 0.8, -tw * 0.7, tw * 1.6, tw * 1.4);
+  ctx.fillStyle = outer;
+  ctx.fillRect(-tw * 0.8 + tw * 0.28, -tw * 0.7, 3, tw * 1.4);
+  ctx.fillRect(-tw * 0.8 + tw * 0.5, -tw * 0.7, 3, tw * 1.4);
+  let ind;
+  if (neon > 0.01) ind = '#fff200';
+  else if (p >= 1) ind = '#4dff9a';
+  else if (Intro.state === 'run' && T >= TUBE_START[i]) ind = (Math.floor(time * 6) % 2) ? '#ffb347' : '#7a4a10';
+  else ind = '#7a1f1f';
+  ctx.fillStyle = ind;
+  ctx.beginPath(); ctx.arc(tw * 0.3, 0, tw * 0.14, 0, 6.2832); ctx.fill();
+  if (neon > 0.01) {
+    ctx.globalCompositeOperation = 'lighter';
+    ctx.lineWidth = 10; ctx.strokeStyle = `rgba(255,230,0,${0.2 * neon})`;
+    ctx.strokeRect(-tw * 0.8, -tw * 0.7, tw * 1.6, tw * 1.4);
+    ctx.lineWidth = 3; ctx.strokeStyle = `rgba(255,245,120,${0.9 * neon})`;
+    ctx.strokeRect(-tw * 0.8, -tw * 0.7, tw * 1.6, tw * 1.4);
+  }
+  ctx.restore();
+
+  // neón sobre el tubo y el collar
+  if (neon > 0.01) {
+    glowLine(x0, y0, x1, y1, wp, neon);
+    ctx.save();
+    ctx.globalCompositeOperation = 'lighter';
+    ctx.lineWidth = 10; ctx.strokeStyle = `rgba(255,240,40,${0.7 * neon})`;
+    ctx.beginPath(); ctx.arc(cx, cy, Rs, th - 0.1, th + 0.1); ctx.stroke();
+    ctx.restore();
+  }
+
+  // destello al conectarse
+  const fa = T - flashAt[i];
+  if (Intro.state === 'run' && fa >= 0 && fa < 0.7) {
+    const k = fa / 0.7;
+    ctx.save();
+    ctx.globalCompositeOperation = 'lighter';
+    ctx.lineWidth = 3; ctx.strokeStyle = `rgba(255,250,180,${0.9 * (1 - k)})`;
+    ctx.beginPath(); ctx.arc(x1, y1, wp * (0.8 + k * 2.4), 0, 6.2832); ctx.stroke();
+    ctx.restore();
+  }
+}
+function drawStructure(cx, cy, R, tw, Rc, regionH, T, neon, time) {
+  const Rs = Rc + tw * 0.9;
+  // anillo de contención
+  ctx.lineCap = 'butt';
+  ctx.setLineDash([26, 14]);
+  ctx.lineWidth = 3; ctx.strokeStyle = '#1d283c';
+  ctx.beginPath(); ctx.arc(cx, cy, Rs, 0, 6.2832); ctx.stroke();
+  ctx.setLineDash([]);
+  ctx.lineWidth = 1; ctx.strokeStyle = '#151d2c';
+  ctx.beginPath(); ctx.arc(cx, cy, Rs + 9, 0, 6.2832); ctx.stroke();
+  if (neon > 0.01) {
+    ctx.save();
+    ctx.globalCompositeOperation = 'lighter';
+    ctx.lineWidth = 8; ctx.strokeStyle = `rgba(255,230,0,${0.12 * neon})`;
+    ctx.beginPath(); ctx.arc(cx, cy, Rs, 0, 6.2832); ctx.stroke();
+    ctx.lineWidth = 2; ctx.strokeStyle = `rgba(255,245,120,${0.7 * neon})`;
+    ctx.beginPath(); ctx.arc(cx, cy, Rs, 0, 6.2832); ctx.stroke();
+    ctx.restore();
+  }
+  for (let i = 0; i < PORTS.length; i++) drawPort(i, cx, cy, R, tw, Rc, regionH, T, neon, time);
+}
+
+// ---------- estado y conexión ----------
+let S = { temp: 20, fuel: 0, coolant: 0, shieldIntegrity: 100, ignited: false, phase: 'NORMAL', phaseTime: 0,
+  power: 0, score: 0, completed: 0, streak: 0, mission: null, event: null, notices: [] };
+let disp = 20;
+const drag = { fuel: false, cool: false };
+
+function send(c) {
+  fetch('/cmd', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(c) }).catch(() => {});
+}
+const es = new EventSource('/events');
+es.onopen = () => { el.link.textContent = 'conectado al servidor'; el.link.className = 'ok'; };
+es.onerror = () => { el.link.textContent = 'sin conexión (reintentando...)'; el.link.className = ''; };
+es.onmessage = (e) => {
+  const prev = S;
+  S = JSON.parse(e.data);
+  Snd.onChange(prev, S);
+  gameFeed(prev, S);
+  syncUI();
+};
+
+function updateThermalHud() {
+  const temp=Number(S.temp)||20;
+  let level='NOMINAL', cls='', detail='RANGO TÉRMICO NORMAL';
+  if(S.phase==='MELTDOWN'||temp>=500000){level='DANGER';cls='danger';detail='LÍMITE TÉRMICO · ESTADO CRÍTICO';}
+  else if(temp>=400000){level='WARNING';cls='warning';detail='TEMPERATURA MUY ELEVADA';}
+  else if(temp>=300000){level='CAUTION';cls='caution';detail='PRECAUCIÓN · VIGILAR TEMPERATURA';}
+  else if(temp>=200000){level='INESTABLE';cls='unstable';detail='INTEGRIDAD DEL ESCUDO EN DESCENSO';}
+  el.thermalHud.className=cls;
+  el.thermalState.textContent=level;
+  el.thermalDetail.textContent=detail;
+  const integrity=Math.max(0,Math.min(100,Number(S.shieldIntegrity??100)));
+  el.shieldValue.textContent=Math.round(integrity)+'%';
+  el.shieldFill.style.width=integrity+'%';
+  if(integrity>65){el.shieldFill.style.background='linear-gradient(90deg,#49d5ff,#7dffb0)';el.shieldValue.style.color='#7dffb0';}
+  else if(integrity>30){el.shieldFill.style.background='linear-gradient(90deg,#ffe27a,#ffad61)';el.shieldValue.style.color='#ffbd78';}
+  else{el.shieldFill.style.background='linear-gradient(90deg,#ffad61,#ff4d5c)';el.shieldValue.style.color='#ff6b73';}
+}
+function syncUI() {
+  updateThermalHud();
+  renderGame();
+  const locked = S.phase !== 'NORMAL' || !Intro.done;
+  const racks = S.servers || { compute:false, storage:false, network:false };
+  const serverCount = ['compute','storage','network'].filter(k => !!racks[k]).length;
+  const pumpCount = [Number(S.coolant)>0, Number(S.fuel)>0].filter(Boolean).length;
+  el.requirements.textContent = localRequirementMessage || S.message || ('REQUISITOS · SERVIDORES ' + serverCount + '/3 · BOMBAS ' + pumpCount + '/2');
+  el.requirements.style.color = (localRequirementMessage || S.message) ? '#ffbd78' : (serverCount===3 && pumpCount===2 ? '#7dffb0' : '#a8bdd3');
+  el.fuel.disabled = locked; el.cool.disabled = locked;
+  el.ign.disabled = locked || S.ignited; el.scram.disabled = locked;
+  if (Intro.state === 'loading') el.ign.textContent = 'PREPARANDO...';
+  else if (Intro.state === 'run') el.ign.textContent = 'SECUENCIA...';
+  else el.ign.textContent = S.ignited ? 'ENCENDIDO' : 'IGNICIÓN';
+  if (!drag.fuel) el.fuel.value = S.fuel;
+  if (!drag.cool) el.cool.value = S.coolant;
+  el.fuelV.textContent = Math.round(el.fuel.value) + '%';
+  const ce = S.event && S.event.cool !== 1 ? S.event.cool : 1;
+  el.coolV.textContent = Math.round(el.cool.value) + '%' + (ce !== 1 ? ' · EFIC. x' + ce : '');
+  el.cl.classList.toggle('fail', !!(S.event && S.event.id === 'pump' && S.phase === 'NORMAL'));
+  const he = S.event && S.event.heat !== 1 ? S.event.heat : 1;
+  el.fuelV.textContent = Math.round(el.fuel.value) + '%' + (he !== 1 ? ' · EFIC. x' + he : '');
+  el.cr.classList.toggle('fail', !!(S.event && S.event.id === 'pump2' && S.phase === 'NORMAL'));
+  let txt = 'APAGADO', cls = '';
+  if (S.phase === 'MELTDOWN') { txt = 'MELTDOWN ' + meltLeftTxt(S); cls = 'melt'; }
+  else if (S.phase === 'COOLDOWN') {
+    const left = Math.max(0, Math.log10(Math.max(S.temp, 20.001) / 20) * ((S.coolSeconds || 10) / LOG_RANGE));
+    const m = Math.floor(left / 60), sec = Math.floor(left % 60);
+    txt = 'ENFRIANDO ' + m + ':' + String(sec).padStart(2, '0'); cls = 'cool';
+  }
+  else if (S.ignited && S.temp > 200000) { txt = 'ALERTA: TEMPERATURA CRÍTICA'; cls = 'warn'; }
+  else if (S.ignited) { txt = 'PLASMA ENCENDIDO'; cls = 'on'; }
+  el.status.textContent = txt; el.status.className = cls;
+  if (S.phase === 'MELTDOWN') { el.alert.style.display = 'block'; el.alert.style.color = '#ff4d4d'; el.alert.textContent = 'EXPLOSIÓN EN ' + meltLeftTxt(S); }
+  else el.alert.style.display = 'none';
+  // pantalla de reconstrucción (aparece tras la explosión)
+  const showRb = S.phase === 'COOLDOWN' && !(explode && explode.t < 3.2);
+  RB.box.classList.toggle('show', showRb);
+  if (S.phase === 'COOLDOWN') {
+    const tot = S.coolSeconds || 10;
+    const left2 = Math.max(0, Math.log10(Math.max(S.temp, 20.001) / 20) * (tot / LOG_RANGE));
+    // la pantalla dura 10 s: los primeros ~3 s del enfriado son la explosión
+    const rbLeft = Math.min(10, Math.max(0, left2 - (tot - 10)));
+    RB.fill.style.width = Math.round(100 * (1 - rbLeft / 10)) + '%';
+    RB.time.textContent = 'RESTAN ' + Math.ceil(rbLeft) + ' s';
+  }
+}
+function pushSet() { send({ type: 'set', fuel: +el.fuel.value, coolant: +el.cool.value }); }
+for (const [k, node] of [['fuel', el.fuel], ['cool', el.cool]]) {
+  node.addEventListener('pointerdown', () => { drag[k] = true; });
+  for (const ev of ['pointerup', 'pointercancel', 'change']) node.addEventListener(ev, () => { drag[k] = false; });
+  node.addEventListener('input', () => {
+    el.fuelV.textContent = Math.round(el.fuel.value) + '%';
+    el.coolV.textContent = Math.round(el.cool.value) + '%';
+    pushSet();
+  });
+}
+el.ign.onclick = introBegin;
+el.scram.onclick = () => send({ type: 'scram' });
+
+// ---------- contratos, eventos y avisos ----------
+const MW_MAX = 500;
+let bestScore = 0;
+try { bestScore = Number(localStorage.getItem('plrc_best')) || 0; } catch (e) { /* sin almacenamiento */ }
+let lastNoticeId = -1, feedReady = false;
+const pwrHist = [];
+let trend = 0;
+let evFade = 0, fxId = null, pulseFlash = 0, boltFlash = 0, bolt = null, impact = 0, ripple = 1;
+
+function fmtN(n) { return Math.round(n).toLocaleString('es-AR'); }
+function fmtTime(sec) {
+  const t = Math.max(0, Math.ceil(sec));
+  return Math.floor(t / 60) + ':' + String(t % 60).padStart(2, '0');
+}
+el.evFix.addEventListener('click', () => send({ type: 'repair' }));
+
+// Voz de la IA de la estación (A.R.I.A.): solo frases cortas en los momentos importantes.
+const Voice = (() => {
+  let on = true;
+  try { if (localStorage.getItem('plrc_voice') === '0') on = false; } catch (e) { /* sin almacenamiento */ }
+  function pick() {
+    const vs = (window.speechSynthesis && speechSynthesis.getVoices()) || [];
+    return vs.find((v) => /^es-(AR|MX|US|419)/i.test(v.lang)) || vs.find((v) => /^es/i.test(v.lang)) || null;
+  }
+  // Voz ElevenLabs (si el servidor la tiene configurada); si falla, voz del navegador
+  let remote = false, clip = null;
+  fetch('/voz-info').then((r) => r.json()).then((j) => { remote = !!j.enabled; }).catch(() => {});
+  function playRemote(text, urgent) {
+    if (clip && !clip.ended && !clip.paused) {
+      if (!urgent) return;
+      clip.pause();
+    }
+    const a = new Audio('/voz?t=' + encodeURIComponent(text));
+    a.volume = Math.min(1, Math.max(0, Number(el.volVoz.value) / 100));
+    clip = a;
+    a.addEventListener('error', () => { if (clip === a) speakLocal(text, urgent); });
+    a.play().catch(() => {});
+  }
+  function say(text, urgent) {
+    if (!on || !text) return;
+    if (!el.snd.classList.contains('on')) return; // respeta el botón de sonido
+    if (remote) playRemote(text, urgent); else speakLocal(text, urgent);
+  }
+  function speakLocal(text, urgent) {
+    if (!('speechSynthesis' in window)) return;
+    try {
+      if (speechSynthesis.speaking || speechSynthesis.pending) {
+        if (!urgent) return;
+        speechSynthesis.cancel();
+      }
+      const u = new SpeechSynthesisUtterance(text);
+      const v = pick();
+      if (v) { u.voice = v; u.lang = v.lang; } else { u.lang = 'es-ES'; }
+      u.rate = 1.0; u.pitch = 0.75;
+      u.volume = Math.min(1, Math.max(0, Number(el.volVoz.value) / 100));
+      speechSynthesis.speak(u);
+    } catch (e) { /* sin voz disponible */ }
+  }
+  function refresh() { el.voz.textContent = '🗣 VOZ IA'; el.voz.className = on ? 'on' : ''; }
+  function toggle() {
+    on = !on;
+    if (!on) { if ('speechSynthesis' in window) speechSynthesis.cancel(); if (clip) clip.pause(); }
+    try { localStorage.setItem('plrc_voice', on ? '1' : '0'); } catch (e) { /* sin almacenamiento */ }
+    refresh();
+  }
+  return { say, toggle, refresh };
+})();
+try { const sv = localStorage.getItem('plrc_voice_vol'); if (sv !== null) el.volVoz.value = sv; } catch (e) { /* sin almacenamiento */ }
+el.volVoz.addEventListener('input', () => { try { localStorage.setItem('plrc_voice_vol', el.volVoz.value); } catch (e) { /* sin almacenamiento */ } });
+el.volVoz.addEventListener('change', () => Voice.say('Volumen de la voz.', true));
+el.voz.addEventListener('click', () => Voice.toggle());
+Voice.refresh();
+const VOICE_LINES = {
+  'mission-ok': 'Entrega completada. Buen trabajo, operador.',
+  'ev-summer': 'Atención. Ola de calor. El refrigerante pierde eficiencia.',
+  'ev-winter': 'Atención. Frente frío. El refrigerante gana eficiencia.',
+  'ev-storm': 'Alerta. Tormenta solar. El plasma genera más calor.',
+  'ev-pump': 'Alerta. Falla en la bomba uno. Reparación disponible.',
+  'ev-pump2': 'Alerta. Falla en la bomba dos. Reparación disponible.',
+  'ev-demand': 'Pico de demanda. La red paga el doble.',
+  'ev-pulse': 'Cuidado. Pulso de plasma detectado.',
+  'ev-meteors': 'Alerta. Lluvia de meteoritos. Escudo en riesgo.',
+  'repair-start': 'Equipo de mantenimiento en camino.',
+  'repair-ok': 'Sistema reparado.',
+};
+function meltLeftTxt(S) {
+  const left = Math.max(0, Math.ceil((S.meltSeconds || 130) - S.phaseTime));
+  return Math.floor(left / 60) + ':' + String(left % 60).padStart(2, '0');
+}
+function rankOf(score) {
+  return score >= 10000 ? 'ALMIRANTE' : score >= 4000 ? 'COMANDANTE' : score >= 1500 ? 'INGENIERO' : score >= 500 ? 'OPERADOR' : 'CADETE';
+}
+function thermalLevel(s) {
+  const t = Number(s.temp) || 20;
+  return (s.phase === 'MELTDOWN' || t >= 500000) ? 4 : t >= 400000 ? 3 : t >= 300000 ? 2 : t >= 200000 ? 1 : 0;
+}
+function showToast(n) {
+  const d = document.createElement('div');
+  d.className = 'toast ' + (n.kind || 'info');
+  d.textContent = n.text;
+  el.toasts.appendChild(d);
+  while (el.toasts.children.length > 3) el.toasts.firstChild.remove();
+  setTimeout(() => { d.classList.add('out'); setTimeout(() => d.remove(), 600); }, 7000);
+}
+function gameFeed(prev, cur) {
+  // avisos del servidor (contratos, eventos, charla de la sala de control)
+  const list = cur.notices || [];
+  const top = list.length ? list[list.length - 1].id : -1;
+  if (!feedReady) {
+    feedReady = true;
+    lastNoticeId = top;
+  } else {
+    if (top < lastNoticeId) lastNoticeId = top; // el servidor se reinició
+    for (const n of list) {
+      if (n.id > lastNoticeId) {
+        lastNoticeId = n.id;
+        showToast(n);
+        if (n.sfx) Snd.sfx(n.sfx);
+        if (n.sfx === 'mission-new' && cur.mission) Voice.say('Nuevo contrato. ' + cur.mission.name + '. ' + cur.mission.mw + ' megavatios.');
+        else if (n.sfx === 'mission-fail') Voice.say(/^MELTDOWN/.test(n.text) ? 'Alerta. Meltdown. Contención perdida. Explosión en dos minutos.' : 'Contrato fallido.', true);
+        else if (VOICE_LINES[n.sfx]) Voice.say(VOICE_LINES[n.sfx]);
+      }
+    }
+  }
+  if (cur.event && cur.event.id === 'pulse' && !(prev.event && prev.event.id === 'pulse')) pulseFlash = 1;
+
+  // meltdown: avisos por voz de la cuenta y explosión
+  if (cur.phase === 'MELTDOWN') {
+    const left = (cur.meltSeconds || 130) - cur.phaseTime;
+    if (prev.phase !== 'MELTDOWN') meltSaid = 0;
+    if (meltSaid < 1 && left <= 60) { meltSaid = 1; Voice.say('Explosión en un minuto.', true); }
+    else if (meltSaid < 2 && left <= 30) { meltSaid = 2; Voice.say('Treinta segundos.', true); }
+    else if (meltSaid < 3 && left <= 10) { meltSaid = 3; Voice.say('Diez segundos.', true); }
+  }
+  if (prev.phase === 'MELTDOWN' && cur.phase === 'COOLDOWN') {
+    explode = { t: 0, debris: null };
+    setTimeout(() => Voice.say('Reactor en reconstrucción.', true), 3500);
+  }
+  if (prev.phase === 'COOLDOWN' && cur.phase === 'NORMAL') Voice.say('Reactor reconstruido. Listo para reiniciar.');
+  // impactos del evento de meteoritos
+  if (cur.event && cur.event.id === 'meteors' && prev.event && prev.event.id === 'meteors' && cur.event.hits > prev.event.hits) {
+    impact = 1; ripple = 0; Snd.sfx('impact');
+  }
+  // aviso por voz al subir de nivel térmico
+  if (cur.ignited && thermalLevel(cur) > thermalLevel(prev) && thermalLevel(cur) < 4) {
+    Voice.say(['', 'El escudo está bajo estrés.', 'Precaución. Temperatura elevada.', 'Advertencia. Temperatura muy alta.'][thermalLevel(cur)]);
+  }
+  // tendencia de la potencia (MW por segundo, promedio de los últimos ~3 s)
+  const now = performance.now();
+  pwrHist.push([now, Number(cur.power) || 0]);
+  while (pwrHist.length > 2 && now - pwrHist[0][0] > 3000) pwrHist.shift();
+  const a = pwrHist[0], b = pwrHist[pwrHist.length - 1];
+  trend = b[0] - a[0] > 800 ? (b[1] - a[1]) / ((b[0] - a[0]) / 1000) : 0;
+
+  if ((cur.score || 0) > bestScore) {
+    bestScore = cur.score;
+    try { localStorage.setItem('plrc_best', String(bestScore)); } catch (e) { /* sin almacenamiento */ }
+  }
+}
+function renderGame() {
+  const m = S.mission, mw = Number(S.power) || 0, ev = S.event;
+  $('mScore').textContent = '★ ' + fmtN(S.score || 0);
+  $('mTitle').textContent = rankOf(S.score || 0) + ' · CONTRATOS';
+  $('mStreak').textContent = 'RACHA x' + (S.streak || 0);
+  $('mBest').textContent = 'RÉCORD ' + fmtN(bestScore);
+  $('mDone').textContent = (S.completed || 0) + ' entregas';
+
+  let col = '#cfe3ff';
+  if (m) {
+    $('mName').textContent = m.name.toUpperCase();
+    $('mDesc').textContent = 'CONTRATO ' + m.n + '/' + m.total + (m.lap > 1 ? ' · VUELTA ' + m.lap : '') +
+      ' · ENTREGAR ' + m.mw + ' A ' + m.bandMax + ' MW DURANTE ' + m.hold + ' s';
+    const gb = $('gBand');
+    gb.style.display = 'block';
+    gb.style.left = (m.mw / MW_MAX * 100) + '%';
+    gb.style.width = ((m.bandMax - m.mw) / MW_MAX * 100) + '%';
+    $('mProg').style.width = (m.progress / m.hold * 100) + '%';
+    $('mProgTxt').textContent = 'ENTREGA ' + Math.floor(m.progress) + '/' + m.hold + ' s';
+    $('mTime').textContent = 'TIEMPO ' + fmtTime(m.timeLeft);
+    $('mTime').style.color = m.timeLeft < 30 ? '#ff6b73' : '';
+    $('mReward').textContent = '★ ' + fmtN(m.reward);
+    col = m.inBand ? '#7dffb0' : (mw < m.mw ? '#ffe27a' : '#ff6b73');
+  } else {
+    $('mName').textContent = S.ignited ? 'ESPERANDO CONTRATO...' : 'SIN CONTRATO';
+    $('mDesc').textContent = S.ignited
+      ? 'La red regional está preparando el próximo pedido.'
+      : ((Intro.state === 'run' || Intro.state === 'loading')
+        ? 'Secuencia de ignición en curso: los contratos llegan cuando el reactor esté en línea.'
+        : (S.phase !== 'NORMAL'
+          ? 'Reactor fuera de línea: esperá a que termine el enfriado.'
+          : 'Encendé el reactor para recibir contratos.'));
+    $('gBand').style.display = 'none';
+    $('mProg').style.width = '0%';
+    $('mProgTxt').textContent = 'ENTREGA —';
+    $('mTime').textContent = '—';
+    $('mTime').style.color = '';
+    $('mReward').textContent = '★ —';
+  }
+  $('gFill').style.width = Math.min(100, mw / MW_MAX * 100) + '%';
+  $('mMW').textContent = fmtN(mw) + ' MW';
+  $('mMW').style.color = col;
+  $('mTrend').textContent = !S.ignited ? '—'
+    : (Math.abs(trend) < 0.02 ? '● ESTABLE'
+      : (trend > 0 ? '▲ +' : '▼ −') + Math.abs(trend).toFixed(2) + ' MW/s');
+
+  // cartel del evento activo
+  if (ev && S.phase === 'NORMAL') {
+    el.evBanner.dataset.ev = ev.id;
+    el.evIcon.textContent = ev.icon;
+    el.evName.textContent = ev.name + (ev.id === 'pulse' ? '' : ' · ' + fmtTime(ev.timeLeft));
+    const rp = ev.repair;
+    el.evDesc.textContent = rp ? 'Reparando... ' + Math.ceil(rp.timeLeft) + ' s' : ev.desc;
+    el.evFill.style.width = (rp ? rp.timeLeft / rp.total : Math.max(0, ev.timeLeft / ev.total)) * 100 + '%';
+    el.evFix.style.display = (ev.repairable && !rp && S.ignited) ? 'inline-block' : 'none';
+    el.evFix.textContent = '🔧 REPARAR · -' + Math.min(S.score || 0, 50) + ' cr';
+    el.evBanner.classList.add('show');
+  } else {
+    el.evBanner.classList.remove('show');
+  }
+}
+
+// efectos visuales de los eventos (capa transparente sobre el reactor)
+const flakes = Array.from({ length: 110 }, () => ({ x: Math.random(), y: Math.random(), r: 1 + Math.random() * 2.2, v: 20 + Math.random() * 50, ph: Math.random() * 6.28 }));
+const embers = Array.from({ length: 70 }, () => ({ x: Math.random(), y: Math.random(), r: 1 + Math.random() * 2, v: 15 + Math.random() * 45, ph: Math.random() * 6.28 }));
+function makeBolt() {
+  const pts = [];
+  let x = W * (0.1 + Math.random() * 0.8), y = 0;
+  const ty = H * (0.4 + Math.random() * 0.3);
+  while (y < ty) { pts.push([x, y]); x += (Math.random() - 0.5) * 60; y += 20 + Math.random() * 30; }
+  return pts;
+}
+// efectos de espacio: estrellas que titilan, estrellas fugaces y barrido de radar
+const RC = { x: 0, y: 0, R: 0 };
+const twinkles = Array.from({ length: 55 }, () => ({ x: Math.random(), y: Math.random(), sp: 0.6 + Math.random() * 2, ph: Math.random() * 6.28, r: 1 + Math.random() * 1.5 }));
+const meteors = [];
+let shoot = null, shootIn = 6;
+function drawSpaceFx(time, dt) {
+  fctx.save();
+  for (const t of twinkles) {
+    fctx.fillStyle = 'rgba(220,235,255,' + (0.15 + 0.6 * Math.abs(Math.sin(time * t.sp + t.ph))) + ')';
+    fctx.fillRect(t.x * W, t.y * H, t.r, t.r);
+  }
+  shootIn -= dt;
+  if (!shoot && shootIn <= 0) {
+    shoot = { x: W * (0.1 + Math.random() * 0.6), y: topH + Math.random() * H * 0.25, vx: 520 + Math.random() * 300, vy: 180 + Math.random() * 120, life: 0 };
+    shootIn = 7 + Math.random() * 10;
+  }
+  if (shoot) {
+    shoot.life += dt; shoot.x += shoot.vx * dt; shoot.y += shoot.vy * dt;
+    const a = Math.max(0, 1 - shoot.life / 0.9);
+    const g = fctx.createLinearGradient(shoot.x, shoot.y, shoot.x - shoot.vx * 0.12, shoot.y - shoot.vy * 0.12);
+    g.addColorStop(0, 'rgba(255,255,255,' + a + ')'); g.addColorStop(1, 'rgba(160,210,255,0)');
+    fctx.strokeStyle = g; fctx.lineWidth = 1.5;
+    fctx.beginPath(); fctx.moveTo(shoot.x, shoot.y); fctx.lineTo(shoot.x - shoot.vx * 0.12, shoot.y - shoot.vy * 0.12); fctx.stroke();
+    if (shoot.life > 0.9) shoot = null;
+  }
+  if (RC.R > 0 && fctx.createConicGradient) {
+    const cg = fctx.createConicGradient(time * 0.7, RC.x, RC.y);
+    cg.addColorStop(0, 'rgba(90,220,255,0)'); cg.addColorStop(0.9, 'rgba(90,220,255,0)'); cg.addColorStop(1, 'rgba(90,220,255,0.10)');
+    fctx.fillStyle = cg;
+    fctx.beginPath(); fctx.arc(RC.x, RC.y, RC.R * 2.7, 0, 6.2832); fctx.fill();
+  }
+  fctx.restore();
+}
+function drawExplosion(dt) {
+  if (!explode) return;
+  explode.t += dt;
+  const t = explode.t, x = RC.x || W / 2, y = RC.y || H / 2, R = RC.R || 150;
+  if (!explode.debris) {
+    explode.debris = Array.from({ length: 140 }, () => {
+      const a = Math.random() * 6.2832, v = 200 + Math.random() * 800;
+      return { x, y, vx: Math.cos(a) * v, vy: Math.sin(a) * v - 120, life: 1.5 + Math.random() * 2.2, s: 1.5 + Math.random() * 3.5, hot: Math.random() };
+    });
+  }
+  fctx.save();
+  // bola de fuego
+  if (t < 2.4) {
+    const u = t / 2.4, r = R * (0.5 + 3.2 * Math.sqrt(u));
+    const g = fctx.createRadialGradient(x, y, 0, x, y, r);
+    g.addColorStop(0, 'rgba(255,255,230,' + (1 - u) + ')');
+    g.addColorStop(0.35, 'rgba(255,190,70,' + 0.8 * (1 - u) + ')');
+    g.addColorStop(1, 'rgba(255,70,20,0)');
+    fctx.fillStyle = g; fctx.beginPath(); fctx.arc(x, y, r, 0, 6.2832); fctx.fill();
+  }
+  // destello blanco de pantalla completa
+  const fl = t < 0.12 ? t / 0.12 : Math.max(0, 1 - (t - 0.12) / 1.8);
+  if (fl > 0.01) { fctx.fillStyle = 'rgba(255,248,235,' + Math.pow(fl, 1.4) + ')'; fctx.fillRect(0, 0, W, H); }
+  // ondas de choque
+  for (const d of [0, 0.3, 0.6]) {
+    const u = (t - d) / 3;
+    if (u > 0 && u < 1) {
+      fctx.strokeStyle = 'rgba(255,' + Math.round(150 + 80 * (1 - u)) + ',80,' + (1 - u) + ')';
+      fctx.lineWidth = 3 + 14 * (1 - u);
+      fctx.beginPath(); fctx.arc(x, y, R * (0.5 + u * 6), 0, 6.2832); fctx.stroke();
+    }
+  }
+  // escombros
+  for (const p of explode.debris) {
+    if (p.life <= 0) continue;
+    p.life -= dt; p.vy += 260 * dt; p.x += p.vx * dt; p.y += p.vy * dt;
+    fctx.fillStyle = p.hot > 0.4 ? 'rgba(255,' + Math.round(120 + 100 * p.hot) + ',50,' + Math.min(1, p.life) + ')' : 'rgba(80,70,65,' + Math.min(1, p.life) + ')';
+    fctx.fillRect(p.x, p.y, p.s, p.s);
+  }
+  fctx.restore();
+  if (t > 6) explode = null;
+}
+function fxFrame(time, dt) {
+  fctx.clearRect(0, 0, W, H);
+  drawSpaceFx(time, dt);
+  drawExplosion(dt);
+  if (impact > 0.01) {
+    fctx.fillStyle = 'rgba(255,170,90,' + (impact * 0.22) + ')';
+    fctx.fillRect(0, 0, W, H);
+    impact *= Math.pow(0.02, dt);
+  }
+  if (ripple < 1) {
+    ripple += dt * 1.4;
+    fctx.strokeStyle = 'rgba(120,220,255,' + ((1 - Math.min(1, ripple)) * 0.8) + ')';
+    fctx.lineWidth = 3;
+    fctx.beginPath(); fctx.arc(RC.x, RC.y, RC.R * (1.2 + ripple * 1.4), 0, 6.2832); fctx.stroke();
+  }
+  if (pulseFlash > 0.01) {
+    fctx.fillStyle = 'rgba(190,215,255,' + (pulseFlash * 0.5) + ')';
+    fctx.fillRect(0, 0, W, H);
+    pulseFlash *= Math.pow(0.03, dt);
+  }
+  const id = (S.event && S.phase === 'NORMAL') ? S.event.id : null;
+  evFade += ((id ? 1 : 0) - evFade) * Math.min(1, dt * 2.5);
+  if (id) fxId = id;
+  if (evFade < 0.02 || !fxId) return;
+
+  fctx.save();
+  fctx.globalAlpha = evFade;
+  if (fxId === 'summer' || fxId === 'demand') {
+    const gold = fxId === 'demand';
+    fctx.fillStyle = gold ? 'rgba(255,214,90,0.06)' : 'rgba(255,120,30,0.08)';
+    fctx.fillRect(0, 0, W, H);
+    if (!gold) {
+      const g = fctx.createLinearGradient(0, H, 0, H * 0.45);
+      g.addColorStop(0, 'rgba(255,140,40,0.18)');
+      g.addColorStop(1, 'rgba(255,140,40,0)');
+      fctx.fillStyle = g; fctx.fillRect(0, 0, W, H);
+    }
+    fctx.fillStyle = gold ? 'rgba(255,226,122,0.75)' : 'rgba(255,170,70,0.6)';
+    for (const p of embers) {
+      p.y -= p.v * dt / H;
+      if (p.y < -0.02) { p.y = 1.02; p.x = Math.random(); }
+      const x = (p.x + Math.sin(time * 1.3 + p.ph) * 0.012) * W, y = p.y * H;
+      fctx.beginPath(); fctx.arc(x, y, p.r, 0, 6.2832); fctx.fill();
+    }
+  } else if (fxId === 'winter') {
+    fctx.fillStyle = 'rgba(120,190,255,0.07)';
+    fctx.fillRect(0, 0, W, H);
+    fctx.fillStyle = 'rgba(235,245,255,0.85)';
+    for (const p of flakes) {
+      p.y += p.v * dt / H * 1.4;
+      p.x += Math.sin(time + p.ph) * 0.02 * dt;
+      if (p.y > 1.02) { p.y = -0.02; p.x = Math.random(); }
+      fctx.beginPath(); fctx.arc(p.x * W, p.y * H, p.r, 0, 6.2832); fctx.fill();
+    }
+  } else if (fxId === 'storm') {
+    fctx.fillStyle = 'rgba(140,90,255,0.06)';
+    fctx.fillRect(0, 0, W, H);
+    if (id && Math.random() < dt * 0.15) { boltFlash = 1; bolt = makeBolt(); Snd.sfx('thunder'); }
+    if (boltFlash > 0.02) {
+      fctx.fillStyle = 'rgba(220,200,255,' + (boltFlash * 0.22) + ')';
+      fctx.fillRect(0, 0, W, H);
+      if (bolt) {
+        fctx.strokeStyle = 'rgba(255,255,255,' + boltFlash + ')';
+        fctx.lineWidth = 2;
+        fctx.beginPath();
+        bolt.forEach((q, i) => (i ? fctx.lineTo(q[0], q[1]) : fctx.moveTo(q[0], q[1])));
+        fctx.stroke();
+      }
+      boltFlash *= Math.pow(0.002, dt);
+    }
+  } else if (fxId === 'pump' || fxId === 'pump2') {
+    const g = fctx.createRadialGradient(W / 2, H / 2, Math.min(W, H) * 0.35, W / 2, H / 2, Math.max(W, H) * 0.75);
+    g.addColorStop(0, 'rgba(255,40,50,0)');
+    g.addColorStop(1, 'rgba(255,40,50,' + (0.18 + 0.1 * Math.sin(time * 7)) + ')');
+    fctx.fillStyle = g; fctx.fillRect(0, 0, W, H);
+  } else if (fxId === 'meteors') {
+    fctx.fillStyle = 'rgba(255,120,60,0.04)';
+    fctx.fillRect(0, 0, W, H);
+    if (id && Math.random() < dt * 2.2) {
+      meteors.push({ x: Math.random() * W * 1.2, y: -20, vx: -(250 + Math.random() * 250), vy: 380 + Math.random() * 260 });
+    }
+    for (let i = meteors.length - 1; i >= 0; i--) {
+      const m = meteors[i];
+      m.x += m.vx * dt; m.y += m.vy * dt;
+      const g = fctx.createLinearGradient(m.x, m.y, m.x - m.vx * 0.18, m.y - m.vy * 0.18);
+      g.addColorStop(0, 'rgba(255,230,180,0.9)'); g.addColorStop(1, 'rgba(255,120,40,0)');
+      fctx.strokeStyle = g; fctx.lineWidth = 2.2;
+      fctx.beginPath(); fctx.moveTo(m.x, m.y); fctx.lineTo(m.x - m.vx * 0.18, m.y - m.vy * 0.18); fctx.stroke();
+      if (m.y > H + 40 || m.x < -60) meteors.splice(i, 1);
+    }
+  } else if (fxId === 'pulse') {
+    fctx.fillStyle = 'rgba(160,200,255,0.05)';
+    fctx.fillRect(0, 0, W, H);
+  }
+  fctx.restore();
+}
+
+// ---------- render ----------
+function frac(t) {
+  if (t <= 20) return 0;
+  return Math.min(1, Math.log10(t / 20) / LOG_RANGE);
+}
+function plasmaColor(f, a) {
+  let h, l;
+  if (f < 0.5) { h = 270 + (f / 0.5) * 120; l = 45 + f * 20; }   // violeta -> magenta -> rojo -> naranja
+  else { h = 30 + ((f - 0.5) / 0.5) * 30; l = 55 + ((f - 0.5) / 0.5) * 40; } // naranja -> amarillo -> blanco
+  return `hsla(${h % 360},100%,${l}%,${a})`;
+}
+
+const N = 650;
+const P = Array.from({ length: N }, () => ({
+  a: Math.random() * 6.2832, r: Math.random() * 2 - 1,
+  sp: 0.6 + Math.random() * 0.8, ph: Math.random() * 6.2832, sz: 1 + Math.random() * 2.2,
+}));
+let angleCore = 0, last = 0;
+
+function frame(t) {
+  const time = t / 1000;
+  const dt = Math.min(0.05, last ? time - last : 0.016);
+  last = time;
+  if ((frameCount++ & 15) === 0) measure();
+  disp += (S.temp - disp) * Math.min(1, dt * 8);
+
+  // La secuencia completa solo empieza al pulsar el botón de ignición.
+  let T = 0, introActive = false;
+  if (Intro.state === 'run') {
+    T = (performance.now() - Intro.t0) / 1000;
+    if (T >= T_END) { introFinish(false); T = T_END; }
+    else { introActive = true; Intro.T = T; introTriggers(T); }
+  }
+  const neon = introActive ? neonAmount(T) : 0;
+  const cam = introActive ? camera(T) : { z: 1, rot: 0, x: 0, y: 0, sh: 0 };
+
+  const melt = S.phase === 'MELTDOWN';
+  const cool = S.phase === 'COOLDOWN';
+  let f = melt ? 1 : frac(disp);
+  let inten = melt ? 1.2 + 1.2 * Math.min(1, S.phaseTime / (S.meltSeconds || 130)) : cool ? 0.12 + f * 0.55 : (S.ignited ? 0.3 + f * 0.9 : 0.07);
+  if (introActive) { const v = introVisuals(T); f = v.f; inten = v.inten; }
+  if (introActive || Intro.state === 'loading') el.status.textContent = 'SECUENCIA DE IGNICIÓN';
+
+  Snd.update(S, f);
+
+  // el reactor ocupa el espacio entre la franja de arriba y los controles de abajo
+  const regionH = Math.max(120, H - topH - botH);
+  const cx = W / 2, cy = topH + regionH / 2;
+  const R = Math.min(W, regionH) * 0.31, tw = R * 0.24;
+  const Rc = R + tw + 16;
+  RC.x = cx; RC.y = cy; RC.R = R;
+
+  if (introActive && T < T_COUNT) {
+    el.count.style.top = cy + 'px';
+    el.count.style.fontSize = Math.round(R * 0.6) + 'px';
+  }
+
+  const mk = melt ? Math.min(1, S.phaseTime / (S.meltSeconds || 130)) : 0;
+  const sh = cam.sh + (melt ? 0.8 + 8 * mk * mk : 0) + (explode && explode.t < 4 ? 18 * (1 - explode.t / 4) : 0);
+  ctx.save();
+  // estela (sin cámara): la imagen anterior se desvanece hacia el fondo espacial
+  ctx.globalCompositeOperation = 'source-over';
+  ctx.globalAlpha = 0.24;
+  ctx.drawImage(bgc, 0, 0, W, H);
+  ctx.globalAlpha = 1;
+  // cámara
+  ctx.translate(cx + cam.x + (Math.random() - 0.5) * 2 * sh, cy + cam.y + (Math.random() - 0.5) * 2 * sh);
+  ctx.rotate(cam.rot);
+  ctx.scale(cam.z, cam.z);
+  ctx.translate(-cx, -cy);
+
+  // carcasa del toroide
+  ctx.lineWidth = tw * 2 + 22;
+  ctx.strokeStyle = '#0e131d';
+  ctx.beginPath(); ctx.arc(cx, cy, R, 0, 6.2832); ctx.stroke();
+  ctx.lineWidth = 2;
+  ctx.strokeStyle = melt ? '#ff5a3a' : (cool ? `hsl(18,85%,${18 + f * 30}%)` : '#2a3750');
+  ctx.beginPath(); ctx.arc(cx, cy, R + tw + 11, 0, 6.2832); ctx.stroke();
+  ctx.beginPath(); ctx.arc(cx, cy, R - tw - 11, 0, 6.2832); ctx.stroke();
+
+  // bobinas magnéticas (se ponen al rojo y se van enfriando)
+  angleCore += dt * (0.2 + inten * 0.6);
+  const COILS = 24;
+  for (let i = 0; i < COILS; i++) {
+    const a = (i / COILS) * 6.2832;
+    const x = cx + Math.cos(a) * R, y = cy + Math.sin(a) * R;
+    ctx.save();
+    ctx.translate(x, y); ctx.rotate(a);
+    const hot = (S.ignited || cool || introActive) ? Math.min(1, 0.2 + f) : 0;
+    ctx.fillStyle = `rgb(${40 + hot * 200},${46 + hot * 60},${62})`;
+    ctx.fillRect(-tw - 14, -7, (tw + 14) * 2, 14);
+    ctx.restore();
+  }
+
+  // estructura: anillo de contención, tanques y tubos
+  drawStructure(cx, cy, R, tw, Rc, regionH, T, neon, time);
+
+  // brillo del núcleo
+  ctx.globalCompositeOperation = 'lighter';
+  const g = ctx.createRadialGradient(cx, cy, 0, cx, cy, R * 0.9);
+  g.addColorStop(0, plasmaColor(f, Math.min(0.5, 0.04 + inten * 0.12)));
+  g.addColorStop(1, 'rgba(0,0,0,0)');
+  ctx.fillStyle = g; ctx.fillRect(cx - R, cy - R, R * 2, R * 2);
+
+  // plasma (partículas)
+  const speedBase = 0.5 + inten * 2.2;
+  for (const p of P) {
+    p.a += dt * speedBase * p.sp;
+    let ro = p.r * tw * 0.85;
+    ro += Math.sin(time * 6 + p.ph) * tw * 0.12 * (0.4 + inten);
+    if (melt) ro *= 1 + mk * 4.5 + Math.random() * 0.5 * mk;
+    const rr = R + ro;
+    const x = cx + Math.cos(p.a) * rr, y = cy + Math.sin(p.a) * rr;
+    const size = p.sz * (0.6 + inten * 0.9);
+    ctx.fillStyle = plasmaColor(Math.max(0, Math.min(1, f + p.r * 0.08)), Math.min(0.9, 0.18 + inten * 0.4));
+    ctx.beginPath(); ctx.arc(x, y, size, 0, 6.2832); ctx.fill();
+  }
+
+  // chispas sueltas (fuego) cuando está caliente
+  if ((S.ignited || cool || introActive) && f > 0.2) {
+    const n = Math.floor((cool ? 1 : 2) + f * (cool ? 4 : 12) + (melt ? 30 * mk : 0));
+    for (let i = 0; i < n; i++) {
+      const a = Math.random() * 6.2832;
+      const d = R + (Math.random() * 2 - 1) * tw * (1 + (melt ? 3 * mk : 0.4));
+      const x = cx + Math.cos(a) * d, y = cy + Math.sin(a) * d - Math.random() * 14;
+      ctx.fillStyle = plasmaColor(Math.min(1, f + 0.15), 0.8);
+      ctx.beginPath(); ctx.arc(x, y, 1 + Math.random() * 2, 0, 6.2832); ctx.fill();
+    }
+  }
+  ctx.restore();
+
+  // destello de meltdown (pantalla completa)
+  ctx.globalCompositeOperation = 'source-over';
+  if (melt) {
+    const k = (0.02 + 0.15 * mk) + (0.01 + 0.08 * mk) * Math.sin(time * (5 + 25 * mk));
+    ctx.fillStyle = `rgba(255,${90 + Math.random() * 80},50,${k})`;
+    ctx.fillRect(0, 0, W, H);
+  }
+
+  // franja de temperatura (escala logarítmica: sube parejo durante toda la subida)
+  el.temp.textContent = Math.round(disp).toLocaleString('es-AR') + ' °C';
+  el.temp.style.color = melt ? '#ff4d4d' : (cool ? '#ffb27a' : (f > 0.8 ? '#ffb347' : '#cfe3ff'));
+  el.fill.style.width = (frac(disp) * 100) + '%';
+
+  fxFrame(time, dt);
+  requestAnimationFrame(frame);
+}
+requestAnimationFrame(frame);
+document.body.classList.add('ready');
+syncUI();
+</script>
+</body>
+</html>
