@@ -98,31 +98,10 @@ h1{color:#7fb8d8;text-shadow:0 0 12px rgba(80,200,255,.35)}
 #rbFill{display:block;height:100%;width:0;background:linear-gradient(90deg,#ff7a2a,#ffd35a);transition:width .25s}
 #rbTime{font-size:clamp(14px,2.4vw,22px);color:#ffe3b0}
 
-/* Aviso para celulares en vertical */
+/* Aviso exclusivo para celulares en vertical (no afecta a la PC) */
 #orientation-warning{position:fixed;inset:0;background:#05060a;z-index:9999;display:none;flex-direction:column;align-items:center;justify-content:center;text-align:center;padding:20px}
 #orientation-warning h2{color:#ffb347;margin-bottom:10px;font-size:22px}
 #orientation-warning p{color:#8fb4d8;font-size:14px;line-height:1.5}
-
-/* ADAPTACIÓN MÓVIL EN HORIZONTAL */
-@media (max-width: 900px), (pointer: coarse) {
-  #top { padding: 6px 10px; gap: 8px; }
-  #brand { min-width: 120px; }
-  h1 { font-size: 9px; margin-bottom: 2px; }
-  #status { font-size: 9px; padding: 3px 6px; }
-  #link { font-size: 8px; }
-  #temp { font-size: 20px; }
-  #thermo { height: 8px; max-width: 260px; }
-  .ticks { display: none; }
-  #missions { width: 180px; top: 60px; padding: 6px; font-size: 8px; }
-  #thermalHud { width: 140px; top: 38%; left: calc(50% + 90px); padding: 6px; }
-  #bottom { padding: 8px 10px; gap: 8px; }
-  .card { padding: 8px; width: 30%; }
-  label { font-size: 9px; margin-bottom: 3px; }
-  input[type=range] { height: 20px; }
-  #ctr { width: 34%; gap: 6px; }
-  button { padding: 8px 6px; font-size: 10px; letter-spacing: .05em; }
-}
-
 @media (max-width: 900px) and (orientation: portrait) {
   #orientation-warning { display: flex; }
 }
@@ -175,125 +154,4 @@ h1{color:#7fb8d8;text-shadow:0 0 12px rgba(80,200,255,.35)}
       <h1>PLASMA REACTOR CORE</h1>
       <div id="status">CONECTANDO...</div>
       <div id="link">sin conexión</div>
-      <div id="requirements">SERVIDORES 0/3 · BOMBAS 0/2</div>
-    </div>
-    <div id="tempbox">
-      <div id="temp">20 °C</div>
-      <div id="thermo"><div id="fill"></div></div>
-      <div class="ticks"><span>20</span><span>500.000</span></div>
-    </div>
-    <nav id="nav"><a href="/">REACTOR</a><a href="/systems">SISTEMAS</a></nav>
-    <div id="sndbox">
-      <button id="snd">🔇 AUDIO</button>
-      <button id="mus">♪ MÚSICA</button>
-      <button id="voz">🗣 VOZ</button>
-      <input id="vol" type="range" min="0" max="100" value="60">
-    </div>
-  </div>
-
-  <div id="bottom">
-    <div class="card" id="cl">
-      <label><span>REFRIGERANTE</span><span id="coolV">30%</span></label>
-      <input id="cool" type="range" min="0" max="100" value="30">
-    </div>
-    <div id="ctr">
-      <button id="ign">IGNICIÓN</button>
-      <button id="scram">SCRAM</button>
-    </div>
-    <div class="card" id="cr">
-      <label><span>INYECCIÓN DE PLASMA</span><span id="fuelV">0%</span></label>
-      <input id="fuel" type="range" min="0" max="100" value="0">
-    </div>
-  </div>
-  <button id="skip">SALTAR ▸</button>
-</div>
-
-<script>
-const $ = (id) => document.getElementById(id);
-const cv = $('cv'), ctx = cv.getContext('2d');
-const fx = $('fx'), fctx = fx.getContext('2d');
-const el = {
-  fuel: $('fuel'), cool: $('cool'), fuelV: $('fuelV'), coolV: $('coolV'),
-  ign: $('ign'), scram: $('scram'), status: $('status'), temp: $('temp'),
-  fill: $('fill'), link: $('link'), alert: $('alert'), requirements: $('requirements'),
-  vol: $('vol'), snd: $('snd'), mus: $('mus'), skip: $('skip'), count: $('count'), 
-  intromsg: $('intromsg'), thermalHud: $('thermalHud'), thermalState: $('thermalState'), 
-  thermalDetail: $('thermalDetail'), shieldValue: $('shieldValue'), shieldFill: $('shieldFill'),
-  voz: $('voz'), evFix: $('evFix'), missions: $('missions'), toasts: $('toasts'),
-  evBanner: $('evBanner'), evIcon: $('evIcon'), evName: $('evName'), evDesc: $('evDesc'), evFill: $('evFill'),
-};
-const LOG_RANGE = Math.log10(500000 / 20);
-
-let S = { temp: 20, fuel: 0, coolant: 0, shieldIntegrity: 100, ignited: false, phase: 'NORMAL', phaseTime: 0, power: 0, score: 0 };
-let meltAudio = null;
-
-fetch('/meltdown-info').then(r => r.json()).then(i => {
-  if (i.file) {
-    meltAudio = new Audio('/meltdown');
-    meltAudio.loop = true;
-  }
-}).catch(()=>{});
-
-el.snd.onclick = () => {
-  el.snd.textContent = '🔊 AUDIO';
-  if (meltAudio) { meltAudio.play().then(() => meltAudio.pause()).catch(()=>{}); }
-};
-
-const es = new EventSource('/events');
-es.onopen = () => { el.link.textContent = 'conectado'; el.link.className = 'ok'; };
-es.onmessage = (e) => {
-  const prevPhase = S.phase;
-  S = JSON.parse(e.data);
-  syncUI();
-
-  if (meltAudio) {
-    if (S.phase === 'MELTDOWN' && prevPhase !== 'MELTDOWN') {
-      meltAudio.currentTime = 0;
-      meltAudio.play().catch(() => {});
-    } else if (S.phase !== 'MELTDOWN' && prevPhase === 'MELTDOWN') {
-      meltAudio.pause();
-    }
-  }
-};
-
-function syncUI() {
-  el.temp.textContent = Math.round(S.temp).toLocaleString('es-AR') + ' °C';
-  el.fill.style.width = (Math.log10(Math.max(S.temp, 20) / 20) / LOG_RANGE * 100) + '%';
-  el.status.textContent = S.phase === 'MELTDOWN' ? 'MELTDOWN CRÍTICO' : (S.ignited ? 'PLASMA ACTIVO' : 'APAGADO');
-  el.status.className = S.phase === 'MELTDOWN' ? 'melt' : (S.ignited ? 'on' : '');
-  el.alert.style.display = S.phase === 'MELTDOWN' ? 'block' : 'none';
-  el.alert.textContent = '¡MELTDOWN!';
-  
-  if (S.shieldIntegrity !== undefined) {
-    el.shieldValue.textContent = Math.round(S.shieldIntegrity) + '%';
-    el.shieldFill.style.width = S.shieldIntegrity + '%';
-  }
-}
-
-el.ign.onclick = () => { fetch('/cmd', { method: 'POST', body: JSON.stringify({ type: 'ignite' }) }); };
-el.scram.onclick = () => { fetch('/cmd', { method: 'POST', body: JSON.stringify({ type: 'scram' }) }); };
-el.fuel.oninput = (e) => { fetch('/cmd', { method: 'POST', body: JSON.stringify({ type: 'set', fuel: Number(e.target.value) }) }); };
-el.cool.oninput = (e) => { fetch('/cmd', { method: 'POST', body: JSON.stringify({ type: 'set', coolant: Number(e.target.value) }) }); };
-
-let W = 0, H = 0, DPR = 1;
-function resize() {
-  const dpr = Math.min(window.devicePixelRatio || 1, 2);
-  DPR = dpr;
-  const r = cv.getBoundingClientRect();
-  W = r.width; H = r.height;
-  cv.width = W * dpr; cv.height = H * dpr;
-  ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
-  fx.width = W * dpr; fx.height = H * dpr;
-  fctx.setTransform(dpr, 0, 0, dpr, 0, 0);
-}
-addEventListener('resize', resize);
-resize();
-
-function frame(t) {
-  ctx.clearRect(0, 0, W, H);
-  requestAnimationFrame(frame);
-}
-requestAnimationFrame(frame);
-</script>
-</body>
-</html>
+      <div id="
