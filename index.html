@@ -586,6 +586,7 @@ const Snd = (() => {
   }
   function introStart(hasSong) {
     if (!ac) return;
+    startChirps();
     if (hasSong && introBuf) {
       songSrc = ac.createBufferSource(); songSrc.buffer = introBuf;
       songGain = ac.createGain(); songGain.gain.value = 1;
@@ -615,6 +616,7 @@ const Snd = (() => {
   function introTick() { tone(900, 0.07, 0.1, 'triangle', 0); }
   function introIgnite(hasSong) {
     const k = hasSong ? 0.5 : 1;
+    klaxon(2, 0.08);
     tone(70, 2.0, 0.6 * k, 'sine', 0, 28);
     noiseBurst(1.6, 0.6 * k, 'lowpass', 5000, 120, 0);
     noiseBurst(0.4, 0.3 * k, 'highpass', 3000, 9000, 0);
@@ -706,7 +708,22 @@ const Snd = (() => {
     tone(600, 0.1, 0.15, 'square', 0.25);
     tone(600, 0.1, 0.15, 'square', 0.45);
   }
+  // alarmas: cortas, suaves y siempre limitadas (nada suena en bucle sin fin)
+  let lastKlaxon = 0;
+  function klaxon(cycles, vol) {
+    const v = vol || 0.09;
+    for (let i = 0; i < cycles; i++) {
+      tone(880, 0.32, v, 'triangle', i * 0.7, 640);
+      tone(640, 0.32, v, 'triangle', i * 0.7 + 0.35, 880);
+    }
+  }
+  function startChirps() {
+    // aviso de arranque: tres pitidos que suben
+    for (let i = 0; i < 3; i++) tone(440, 0.22, 0.08, 'triangle', 0.1 + i * 0.4, 880);
+  }
   function meltdown() {
+    klaxon(4, 0.11);
+    if (ac) lastKlaxon = ac.currentTime + 2.8;
     // aviso de inicio de la cuenta: grave y corto (la explosión viene 2:10 después)
     tone(90, 1.4, 0.4, 'sine', 0, 30);
     noiseBurst(1.2, 0.35, 'lowpass', 4000, 150, 0);
@@ -817,6 +834,10 @@ const Snd = (() => {
     }
     // cuenta regresiva de la explosión: pitidos suaves que se aceleran + latido grave
     if (melt) {
+      // alarma de emergencia cada tanto; más seguido en los últimos 30 s y 10 s
+      const leftM = (S.meltSeconds || 130) - S.phaseTime;
+      const gapK = leftM <= 10 ? 2.2 : (leftM <= 30 ? 6 : 14);
+      if (t - lastKlaxon > gapK) { lastKlaxon = t; klaxon(leftM <= 10 ? 1 : 2, 0.1); }
       const gap = Math.max(0.45, 3 - 2.55 * mk);
       if (t - lastBeep > gap) {
         lastBeep = t;
