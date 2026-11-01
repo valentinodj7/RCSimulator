@@ -130,12 +130,26 @@ h1{color:#7fb8d8;text-shadow:0 0 12px rgba(80,200,255,.35)}
   #ctr{order:0;width:100%;justify-content:center}
   .card{width:calc(50% - 6px)}
 }
+
+#stamp{position:fixed;left:50%;bottom:4px;transform:translateX(-50%);z-index:41;font-size:9px;letter-spacing:.12em;color:#5d7a96;opacity:.6;pointer-events:none}
+/* pantalla de reconstrucción */
+#rebuild{position:fixed;left:0;right:0;top:100px;bottom:0;z-index:20;display:flex;align-items:center;justify-content:center;flex-direction:column;gap:14px;text-align:center;background:radial-gradient(ellipse at center,rgba(8,12,22,.72),rgba(2,4,9,.93));opacity:0;pointer-events:none;transition:opacity 1.2s}
+#rebuild.show{opacity:1;pointer-events:auto}
+#rebuild .rbRing{width:90px;height:90px;border-radius:50%;border:3px dashed #ff9a3c;box-shadow:0 0 24px rgba(255,150,50,.35);animation:rbSpin 6s linear infinite}
+@keyframes rbSpin{to{transform:rotate(360deg)}}
+#rebuild h2{margin:0;font-size:clamp(22px,4.6vw,52px);letter-spacing:.16em;color:#ffb347;text-shadow:0 0 22px rgba(255,150,40,.55)}
+#rebuild p{margin:0;font-size:clamp(11px,1.8vw,14px);letter-spacing:.14em;color:#8fb4d8}
+#rbBar{width:min(520px,80vw);height:10px;border:1px solid #6a4a22;border-radius:5px;overflow:hidden;background:repeating-linear-gradient(45deg,#1a1408 0 8px,#120d05 8px 16px)}
+#rbFill{display:block;height:100%;width:0;background:linear-gradient(90deg,#ff7a2a,#ffd35a);transition:width .25s}
+#rbTime{font-size:clamp(14px,2.4vw,22px);color:#ffe3b0;font-variant-numeric:tabular-nums}
 </style>
 </head>
 <body>
 <div id="app">
   <canvas id="cv"></canvas>
   <canvas id="fx"></canvas>
+  <div id="stamp">intro: cuenta 27 s + ignición 10 s</div>
+  <div id="rebuild"><div class="rbRing"></div><h2>REACTOR EN RECONSTRUCCIÓN</h2><p>A.R.I.A.: retirando escombros · reensamblando el núcleo</p><div id="rbBar"><span id="rbFill"></span></div><div id="rbTime"></div></div>
   <div id="alert"></div>
   <div id="count"></div>
   <div id="intromsg"></div>
@@ -345,20 +359,34 @@ const Snd = (() => {
     nextNote = ac.currentTime + 0.2;
     musicTimer = setInterval(musicTick, 120);
   }
-  async function loadMusicFile() {
-    const r = await fetch('/musica');
-    const buf = await r.arrayBuffer();
-    const audioBuf = await ac.decodeAudioData(buf);
-    const src = ac.createBufferSource();
-    src.buffer = audioBuf; src.loop = true;
-    src.connect(musicGain);
-    musicLevel = 0.6;
-    src.start();
+  let tracks = [], trackIdx = 0, curSrc = null;
+  async function playTrack(i) {
+    try {
+      const r = await fetch('/musica?f=' + encodeURIComponent(tracks[i]));
+      const audioBuf = await ac.decodeAudioData(await r.arrayBuffer());
+      if (curSrc) { curSrc.onended = null; try { curSrc.stop(); } catch (e) { /* ya parado */ } }
+      const src = ac.createBufferSource();
+      src.buffer = audioBuf;
+      src.connect(musicGain);
+      musicLevel = 0.6;
+      curSrc = src; trackIdx = i;
+      src.onended = () => { if (curSrc === src) playTrack((trackIdx + 1) % tracks.length); };
+      src.start();
+      el.mus.title = '♪ ' + tracks[i].replace(/^musica\//, '').replace(/\.[^.]+$/, '') + '  (' + (i + 1) + '/' + tracks.length + ')';
+    } catch (e) {
+      if (tracks.length > 1) setTimeout(() => playTrack((i + 1) % tracks.length), 500);
+      else startSynthMusic();
+    }
   }
+  function nextTrack() { if (ac && tracks.length > 1) playTrack((trackIdx + 1) % tracks.length); }
   function startMusic() {
     setupMusicBus();
+    loadExplosion();
     fetch('/musica-info').then((r) => (r.ok ? r.json() : {}))
-      .then((i) => (i && i.file ? loadMusicFile() : startSynthMusic()))
+      .then((i) => {
+        tracks = (i && i.tracks) || [];
+        if (tracks.length) playTrack(0); else startSynthMusic();
+      })
       .catch(() => startSynthMusic());
   }
 
@@ -580,13 +608,59 @@ const Snd = (() => {
     tone(600, 0.1, 0.15, 'square', 0.45);
   }
   function meltdown() {
-    tone(90, 2.2, 0.7, 'sine', 0, 25);
-    noiseBurst(2.6, 0.8, 'lowpass', 6000, 80, 0);
-    noiseBurst(0.5, 0.5, 'highpass', 3000, 9000, 0);
+    // aviso de inicio de la cuenta: grave y corto (la explosión viene 2:10 después)
+    tone(90, 1.4, 0.4, 'sine', 0, 30);
+    noiseBurst(1.2, 0.35, 'lowpass', 4000, 150, 0);
+    for (let i = 0; i < 3; i++) tone(600, 0.14, 0.08, 'triangle', 0.3 + i * 0.25);
   }
   function cooldownStart() {
     tone(300, 2.2, 0.2, 'sawtooth', 0, 30);
     noiseBurst(2.2, 0.3, 'bandpass', 4500, 700, 0);
+  }
+  // explosión del reactor: estruendo + música dramática (tu archivo explosion.mp3 si existe)
+  let explosionBuf = null, meltBuf = null, meltSrc = null, meltGain = null;
+  // canción del meltdown (meltdown.mp3): suena durante toda la cuenta hasta la explosión
+  function startMeltSong() {
+    if (!ac || !meltBuf || meltSrc) return;
+    meltSrc = ac.createBufferSource(); meltSrc.buffer = meltBuf; meltSrc.loop = true;
+    meltGain = ac.createGain(); meltGain.gain.setValueAtTime(0.0001, ac.currentTime);
+    meltGain.gain.linearRampToValueAtTime(0.9, ac.currentTime + 1.5);
+    meltSrc.connect(meltGain); meltGain.connect(master); meltSrc.start();
+  }
+  function stopMeltSong() {
+    if (!meltSrc) return;
+    const s0 = meltSrc, g0 = meltGain; meltSrc = null; meltGain = null;
+    try { g0.gain.cancelScheduledValues(ac.currentTime); g0.gain.setValueAtTime(g0.gain.value, ac.currentTime); g0.gain.linearRampToValueAtTime(0.0001, ac.currentTime + 0.35); s0.stop(ac.currentTime + 0.4); } catch (e) { /* ya parada */ }
+  }
+  function loadExplosion() {
+    fetch('/meltdown-info').then((r) => r.json()).then((i) => {
+      if (!i || !i.file) return null;
+      return fetch('/meltdown').then((r) => r.arrayBuffer()).then((b) => ac.decodeAudioData(b));
+    }).then((b) => { if (b) meltBuf = b; }).catch(() => {});
+    fetch('/explosion-info').then((r) => r.json()).then((i) => {
+      if (!i || !i.file) return null;
+      return fetch('/explosion').then((r) => r.arrayBuffer()).then((b) => ac.decodeAudioData(b));
+    }).then((b) => { if (b) explosionBuf = b; }).catch(() => {});
+  }
+  function explosion() {
+    if (!ac) return;
+    tone(130, 3.8, 0.9, 'sine', 0, 22);
+    tone(60, 3.0, 0.5, 'sawtooth', 0.04, 20);
+    noiseBurst(5.0, 0.9, 'lowpass', 9000, 60, 0);
+    noiseBurst(0.7, 0.55, 'highpass', 2500, 9000, 0);
+    for (let i = 0; i < 9; i++) noiseBurst(0.16, 0.25, 'bandpass', 2400 + Math.random() * 1500, 500, 0.5 + i * 0.32 + Math.random() * 0.2);
+    if (explosionBuf) {
+      const src = ac.createBufferSource(); src.buffer = explosionBuf;
+      const g = ac.createGain(); g.gain.value = 0.9;
+      src.connect(g); g.connect(master); src.start();
+      return;
+    }
+    // música: acorde grave que cae y melodía triste en la menor
+    [110, 130.8, 164.8].forEach((f, i) => tone(f, 4.5, 0.14, 'sawtooth', 0.9 + i * 0.05, f * 0.7));
+    [[440, 1.6], [392, 2.2], [329.6, 2.8], [349.2, 3.4], [329.6, 4.0], [261.6, 4.7], [293.7, 5.4], [220, 6.2]].forEach(([f, w]) => {
+      tone(f, 1.2, 0.09, 'triangle', w);
+      tone(f / 2, 1.4, 0.05, 'sine', w);
+    });
   }
   function ready() {
     tone(523, 0.35, 0.12, 'sine', 0);
@@ -600,8 +674,9 @@ const Snd = (() => {
       if (!p.ignited && c.ignited) ignite();
       if (p.ignited && !c.ignited) scram();
     }
-    if (p.phase !== 'MELTDOWN' && c.phase === 'MELTDOWN') meltdown();
-    if (p.phase === 'MELTDOWN' && c.phase === 'COOLDOWN') cooldownStart();
+    if (p.phase !== 'MELTDOWN' && c.phase === 'MELTDOWN') { meltdown(); startMeltSong(); }
+    if (p.phase === 'MELTDOWN' && c.phase !== 'MELTDOWN') stopMeltSong();
+    if (p.phase === 'MELTDOWN' && c.phase === 'COOLDOWN') explosion();
     if (p.phase === 'COOLDOWN' && c.phase === 'NORMAL') ready();
   }
 
@@ -610,8 +685,9 @@ const Snd = (() => {
     if (!ac || !enabled) return;
     const t = ac.currentTime;
     const melt = S.phase === 'MELTDOWN', cool = S.phase === 'COOLDOWN';
+    const mk = melt ? Math.min(1, S.phaseTime / (S.meltSeconds || 130)) : 0;
     let hg = 0.012, hf = 45, filt = 100, ng = 0, nf = 300;
-    if (melt) { hg = 0.22; hf = 40; filt = 900; ng = 0.35; nf = 1200; }
+    if (melt) { hg = 0.08 + 0.14 * mk; hf = 40 + 20 * mk; filt = 300 + 600 * mk; ng = 0.08 + 0.27 * mk; nf = 500 + 700 * mk; }
     else if (cool) { hg = 0.02 + f * 0.08; hf = 45 + f * 40; filt = 120 + f * 500; ng = 0.01 + f * 0.08; nf = 200 + f * 800; }
     else if (S.ignited) { hg = 0.07 + f * 0.12; hf = 50 + f * 60; filt = 180 + f * 900; ng = 0.02 + f * 0.16; nf = 250 + f * 1800; }
     humGain.gain.setTargetAtTime(hg, t, 0.15);
@@ -620,13 +696,13 @@ const Snd = (() => {
     humFilter.frequency.setTargetAtTime(filt, t, 0.2);
     noiseGain.gain.setTargetAtTime(ng, t, 0.2);
     noiseFilter.frequency.setTargetAtTime(nf, t, 0.2);
-    sirenGain.gain.setTargetAtTime(melt ? 0.12 : 0, t, 0.05);
+    sirenGain.gain.setTargetAtTime(0, t, 0.05);
     steamGain.gain.setTargetAtTime(cool ? 0.015 + f * 0.07 : 0, t, 0.4);
 
     // música: callada durante la intro y mientras suene tu canción; se baja en el meltdown
     if (musicGain) {
       const allow = !introActive && !songPlaying;
-      const mt = (musicOn && allow) ? (melt ? 0 : (cool ? 0.6 : 1)) * musicLevel : 0;
+      const mt = (musicOn && allow) ? (melt ? 0.35 * (1 - mk) : (cool ? 0.3 : 1)) * musicLevel : 0;
       musicGain.gain.setTargetAtTime(mt, t, melt ? 0.1 : 0.8);
       musicLP.frequency.setTargetAtTime(1200 + f * 2500, t, 0.5);
     }
@@ -638,6 +714,15 @@ const Snd = (() => {
       if (t - lastBeep > gap) {
         lastBeep = t;
         for (let i = 0; i < 3; i++) tone(700 + k * 300, 0.1, 0.07, 'triangle', i * 0.18);
+      }
+    }
+    // cuenta regresiva de la explosión: pitidos suaves que se aceleran + latido grave
+    if (melt) {
+      const gap = Math.max(0.45, 3 - 2.55 * mk);
+      if (t - lastBeep > gap) {
+        lastBeep = t;
+        tone(620 + 380 * mk, 0.12, 0.05 + 0.04 * mk, 'triangle', 0);
+        if (mk > 0.4) tone(62, 0.3, 0.1 + 0.1 * mk, 'sine', 0.06, 36);
       }
     }
     // tic-tac del metal enfriándose
@@ -669,7 +754,7 @@ const Snd = (() => {
     el.mus.className = (ac && enabled && musicOn) ? 'on' : '';
   }
   return {
-    unlock, onChange, update, setVol, toggle, toggleMusic, refreshBtn,
+    unlock, onChange, update, setVol, toggle, toggleMusic, nextTrack, refreshBtn,
     prepareIntro, introStart, introStop, introTube, introTick, introIgnite, introDone: ready, setIntroActive, sfx,
   };
 })();
@@ -681,6 +766,8 @@ el.vol.addEventListener('input', () => Snd.setVol(el.vol.value / 100));
 Snd.refreshBtn();
 
 // ---------- canvas ----------
+const RB = { box: $('rebuild'), fill: $('rbFill'), time: $('rbTime') };
+let explode = null, meltSaid = 0;
 let W = 0, H = 0, topH = 90, botH = 100, frameCount = 0, DPR = 1, bgKey = '';
 const bgc = document.createElement('canvas');
 function resize() {
@@ -703,6 +790,7 @@ function measure() {
   el.missions.style.top = (topH + 10) + 'px';
   el.evBanner.style.top = (el.missions.offsetTop + el.missions.offsetHeight + 8) + 'px';
   el.toasts.style.top = (topH + 10) + 'px';
+  RB.box.style.top = topH + 'px';
   buildBackdrop();
 }
 addEventListener('resize', resize);
@@ -779,9 +867,9 @@ function buildBackdrop() {
 }
 
 // ---------- animación de inicio ----------
-// 0-40 s: se conectan 4 tubos de inyección y 2 de refrigerante, con cuenta regresiva.
-// 40-50 s: ignición: tubos amarillo neón y movimiento de cámara. A los 50 s se habilitan los controles.
-const T_COUNT = 40, T_END = 50, TUBE_DUR = 2.2;
+// 0-27 s: se conectan 4 tubos de inyección y 2 de refrigerante, con cuenta regresiva.
+// 27-37 s: ignición: tubos amarillo neón y movimiento de cámara. A los 37 s se habilitan los controles.
+const T_COUNT = 27, T_END = 37, TUBE_DUR = 2.0;
 const PORTS = [
   { ang: -Math.PI / 4, kind: 'main' },      // arriba derecha
   { ang: -3 * Math.PI / 4, kind: 'main' },  // arriba izquierda
@@ -790,7 +878,7 @@ const PORTS = [
   { ang: -Math.PI / 2, kind: 'cool' },      // refrigerante superior
   { ang: Math.PI / 2, kind: 'cool' },       // refrigerante inferior
 ];
-const TUBE_START = [3, 8, 13, 18, 26, 32];
+const TUBE_START = [3, 6, 9, 12, 17, 20];
 const TUBE_NAMES = ['INYECCIÓN 1/4', 'INYECCIÓN 2/4', 'INYECCIÓN 3/4', 'INYECCIÓN 4/4', 'REFRIGERANTE SUPERIOR', 'REFRIGERANTE INFERIOR'];
 
 const Intro = { state: 'wait', t0: 0, T: 0, hasSong: false, done: true }; // wait | loading | run | done
@@ -1121,17 +1209,28 @@ function syncUI() {
   el.fuelV.textContent = Math.round(el.fuel.value) + '%' + (he !== 1 ? ' · EFIC. x' + he : '');
   el.cr.classList.toggle('fail', !!(S.event && S.event.id === 'pump2' && S.phase === 'NORMAL'));
   let txt = 'APAGADO', cls = '';
-  if (S.phase === 'MELTDOWN') { txt = 'MELTDOWN'; cls = 'melt'; }
+  if (S.phase === 'MELTDOWN') { txt = 'MELTDOWN ' + meltLeftTxt(S); cls = 'melt'; }
   else if (S.phase === 'COOLDOWN') {
-    const left = Math.max(0, Math.log10(Math.max(S.temp, 20.001) / 20) * (120 / LOG_RANGE));
+    const left = Math.max(0, Math.log10(Math.max(S.temp, 20.001) / 20) * ((S.coolSeconds || 10) / LOG_RANGE));
     const m = Math.floor(left / 60), sec = Math.floor(left % 60);
     txt = 'ENFRIANDO ' + m + ':' + String(sec).padStart(2, '0'); cls = 'cool';
   }
   else if (S.ignited && S.temp > 200000) { txt = 'ALERTA: TEMPERATURA CRÍTICA'; cls = 'warn'; }
   else if (S.ignited) { txt = 'PLASMA ENCENDIDO'; cls = 'on'; }
   el.status.textContent = txt; el.status.className = cls;
-  if (S.phase === 'MELTDOWN') { el.alert.style.display = 'block'; el.alert.style.color = '#ff4d4d'; el.alert.textContent = 'MELTDOWN'; }
+  if (S.phase === 'MELTDOWN') { el.alert.style.display = 'block'; el.alert.style.color = '#ff4d4d'; el.alert.textContent = 'EXPLOSIÓN EN ' + meltLeftTxt(S); }
   else el.alert.style.display = 'none';
+  // pantalla de reconstrucción (aparece tras la explosión)
+  const showRb = S.phase === 'COOLDOWN' && !(explode && explode.t < 3.2);
+  RB.box.classList.toggle('show', showRb);
+  if (S.phase === 'COOLDOWN') {
+    const tot = S.coolSeconds || 10;
+    const left2 = Math.max(0, Math.log10(Math.max(S.temp, 20.001) / 20) * (tot / LOG_RANGE));
+    // la pantalla dura 10 s: los primeros ~3 s del enfriado son la explosión
+    const rbLeft = Math.min(10, Math.max(0, left2 - (tot - 10)));
+    RB.fill.style.width = Math.round(100 * (1 - rbLeft / 10)) + '%';
+    RB.time.textContent = 'RESTAN ' + Math.ceil(rbLeft) + ' s';
+  }
 }
 function pushSet() { send({ type: 'set', fuel: +el.fuel.value, coolant: +el.cool.value }); }
 for (const [k, node] of [['fuel', el.fuel], ['cool', el.cool]]) {
@@ -1231,6 +1330,10 @@ const VOICE_LINES = {
   'repair-start': 'Equipo de mantenimiento en camino.',
   'repair-ok': 'Sistema reparado.',
 };
+function meltLeftTxt(S) {
+  const left = Math.max(0, Math.ceil((S.meltSeconds || 130) - S.phaseTime));
+  return Math.floor(left / 60) + ':' + String(left % 60).padStart(2, '0');
+}
 function rankOf(score) {
   return score >= 10000 ? 'ALMIRANTE' : score >= 4000 ? 'COMANDANTE' : score >= 1500 ? 'INGENIERO' : score >= 500 ? 'OPERADOR' : 'CADETE';
 }
@@ -1261,13 +1364,26 @@ function gameFeed(prev, cur) {
         showToast(n);
         if (n.sfx) Snd.sfx(n.sfx);
         if (n.sfx === 'mission-new' && cur.mission) Voice.say('Nuevo contrato. ' + cur.mission.name + '. ' + cur.mission.mw + ' megavatios.');
-        else if (n.sfx === 'mission-fail') Voice.say(/^MELTDOWN/.test(n.text) ? 'Alerta. Meltdown. Contención perdida.' : 'Contrato fallido.', true);
+        else if (n.sfx === 'mission-fail') Voice.say(/^MELTDOWN/.test(n.text) ? 'Alerta. Meltdown. Contención perdida. Explosión en dos minutos.' : 'Contrato fallido.', true);
         else if (VOICE_LINES[n.sfx]) Voice.say(VOICE_LINES[n.sfx]);
       }
     }
   }
   if (cur.event && cur.event.id === 'pulse' && !(prev.event && prev.event.id === 'pulse')) pulseFlash = 1;
 
+  // meltdown: avisos por voz de la cuenta y explosión
+  if (cur.phase === 'MELTDOWN') {
+    const left = (cur.meltSeconds || 130) - cur.phaseTime;
+    if (prev.phase !== 'MELTDOWN') meltSaid = 0;
+    if (meltSaid < 1 && left <= 60) { meltSaid = 1; Voice.say('Explosión en un minuto.', true); }
+    else if (meltSaid < 2 && left <= 30) { meltSaid = 2; Voice.say('Treinta segundos.', true); }
+    else if (meltSaid < 3 && left <= 10) { meltSaid = 3; Voice.say('Diez segundos.', true); }
+  }
+  if (prev.phase === 'MELTDOWN' && cur.phase === 'COOLDOWN') {
+    explode = { t: 0, debris: null };
+    setTimeout(() => Voice.say('Reactor en reconstrucción.', true), 3500);
+  }
+  if (prev.phase === 'COOLDOWN' && cur.phase === 'NORMAL') Voice.say('Reactor reconstruido. Listo para reiniciar.');
   // impactos del evento de meteoritos
   if (cur.event && cur.event.id === 'meteors' && prev.event && prev.event.id === 'meteors' && cur.event.hits > prev.event.hits) {
     impact = 1; ripple = 0; Snd.sfx('impact');
@@ -1393,9 +1509,52 @@ function drawSpaceFx(time, dt) {
   }
   fctx.restore();
 }
+function drawExplosion(dt) {
+  if (!explode) return;
+  explode.t += dt;
+  const t = explode.t, x = RC.x || W / 2, y = RC.y || H / 2, R = RC.R || 150;
+  if (!explode.debris) {
+    explode.debris = Array.from({ length: 140 }, () => {
+      const a = Math.random() * 6.2832, v = 200 + Math.random() * 800;
+      return { x, y, vx: Math.cos(a) * v, vy: Math.sin(a) * v - 120, life: 1.5 + Math.random() * 2.2, s: 1.5 + Math.random() * 3.5, hot: Math.random() };
+    });
+  }
+  fctx.save();
+  // bola de fuego
+  if (t < 2.4) {
+    const u = t / 2.4, r = R * (0.5 + 3.2 * Math.sqrt(u));
+    const g = fctx.createRadialGradient(x, y, 0, x, y, r);
+    g.addColorStop(0, 'rgba(255,255,230,' + (1 - u) + ')');
+    g.addColorStop(0.35, 'rgba(255,190,70,' + 0.8 * (1 - u) + ')');
+    g.addColorStop(1, 'rgba(255,70,20,0)');
+    fctx.fillStyle = g; fctx.beginPath(); fctx.arc(x, y, r, 0, 6.2832); fctx.fill();
+  }
+  // destello blanco de pantalla completa
+  const fl = t < 0.12 ? t / 0.12 : Math.max(0, 1 - (t - 0.12) / 1.8);
+  if (fl > 0.01) { fctx.fillStyle = 'rgba(255,248,235,' + Math.pow(fl, 1.4) + ')'; fctx.fillRect(0, 0, W, H); }
+  // ondas de choque
+  for (const d of [0, 0.3, 0.6]) {
+    const u = (t - d) / 3;
+    if (u > 0 && u < 1) {
+      fctx.strokeStyle = 'rgba(255,' + Math.round(150 + 80 * (1 - u)) + ',80,' + (1 - u) + ')';
+      fctx.lineWidth = 3 + 14 * (1 - u);
+      fctx.beginPath(); fctx.arc(x, y, R * (0.5 + u * 6), 0, 6.2832); fctx.stroke();
+    }
+  }
+  // escombros
+  for (const p of explode.debris) {
+    if (p.life <= 0) continue;
+    p.life -= dt; p.vy += 260 * dt; p.x += p.vx * dt; p.y += p.vy * dt;
+    fctx.fillStyle = p.hot > 0.4 ? 'rgba(255,' + Math.round(120 + 100 * p.hot) + ',50,' + Math.min(1, p.life) + ')' : 'rgba(80,70,65,' + Math.min(1, p.life) + ')';
+    fctx.fillRect(p.x, p.y, p.s, p.s);
+  }
+  fctx.restore();
+  if (t > 6) explode = null;
+}
 function fxFrame(time, dt) {
   fctx.clearRect(0, 0, W, H);
   drawSpaceFx(time, dt);
+  drawExplosion(dt);
   if (impact > 0.01) {
     fctx.fillStyle = 'rgba(255,170,90,' + (impact * 0.22) + ')';
     fctx.fillRect(0, 0, W, H);
@@ -1528,7 +1687,7 @@ function frame(t) {
   const melt = S.phase === 'MELTDOWN';
   const cool = S.phase === 'COOLDOWN';
   let f = melt ? 1 : frac(disp);
-  let inten = melt ? 2.4 : cool ? 0.12 + f * 0.55 : (S.ignited ? 0.3 + f * 0.9 : 0.07);
+  let inten = melt ? 1.2 + 1.2 * Math.min(1, S.phaseTime / (S.meltSeconds || 130)) : cool ? 0.12 + f * 0.55 : (S.ignited ? 0.3 + f * 0.9 : 0.07);
   if (introActive) { const v = introVisuals(T); f = v.f; inten = v.inten; }
   if (introActive || Intro.state === 'loading') el.status.textContent = 'SECUENCIA DE IGNICIÓN';
 
@@ -1546,7 +1705,8 @@ function frame(t) {
     el.count.style.fontSize = Math.round(R * 0.6) + 'px';
   }
 
-  const sh = cam.sh + (melt ? 7 : 0);
+  const mk = melt ? Math.min(1, S.phaseTime / (S.meltSeconds || 130)) : 0;
+  const sh = cam.sh + (melt ? 0.8 + 8 * mk * mk : 0) + (explode && explode.t < 4 ? 18 * (1 - explode.t / 4) : 0);
   ctx.save();
   // estela (sin cámara): la imagen anterior se desvanece hacia el fondo espacial
   ctx.globalCompositeOperation = 'source-over';
@@ -1598,7 +1758,7 @@ function frame(t) {
     p.a += dt * speedBase * p.sp;
     let ro = p.r * tw * 0.85;
     ro += Math.sin(time * 6 + p.ph) * tw * 0.12 * (0.4 + inten);
-    if (melt) ro *= 1 + S.phaseTime * 1.4 + Math.random() * 0.5;
+    if (melt) ro *= 1 + mk * 4.5 + Math.random() * 0.5 * mk;
     const rr = R + ro;
     const x = cx + Math.cos(p.a) * rr, y = cy + Math.sin(p.a) * rr;
     const size = p.sz * (0.6 + inten * 0.9);
@@ -1608,10 +1768,10 @@ function frame(t) {
 
   // chispas sueltas (fuego) cuando está caliente
   if ((S.ignited || cool || introActive) && f > 0.2) {
-    const n = Math.floor((cool ? 1 : 2) + f * (cool ? 4 : 12) + (melt ? 30 : 0));
+    const n = Math.floor((cool ? 1 : 2) + f * (cool ? 4 : 12) + (melt ? 30 * mk : 0));
     for (let i = 0; i < n; i++) {
       const a = Math.random() * 6.2832;
-      const d = R + (Math.random() * 2 - 1) * tw * (1 + (melt ? 3 : 0.4));
+      const d = R + (Math.random() * 2 - 1) * tw * (1 + (melt ? 3 * mk : 0.4));
       const x = cx + Math.cos(a) * d, y = cy + Math.sin(a) * d - Math.random() * 14;
       ctx.fillStyle = plasmaColor(Math.min(1, f + 0.15), 0.8);
       ctx.beginPath(); ctx.arc(x, y, 1 + Math.random() * 2, 0, 6.2832); ctx.fill();
@@ -1622,7 +1782,7 @@ function frame(t) {
   // destello de meltdown (pantalla completa)
   ctx.globalCompositeOperation = 'source-over';
   if (melt) {
-    const k = 0.16 + 0.12 * Math.sin(time * 30);
+    const k = (0.02 + 0.15 * mk) + (0.01 + 0.08 * mk) * Math.sin(time * (5 + 25 * mk));
     ctx.fillStyle = `rgba(255,${90 + Math.random() * 80},50,${k})`;
     ctx.fillRect(0, 0, W, H);
   }

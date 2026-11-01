@@ -762,6 +762,10 @@ const server = http.createServer((req, res) => {
       console.log('Voz IA: ' + e.message + ' (se usa la voz del navegador)');
       res.writeHead(502); res.end();
     });
+  } else if (req.method === 'GET' && url === '/meltdown-info') {
+    json(res, { file: findAudio('meltdown') });
+  } else if (req.method === 'GET' && url === '/meltdown') {
+    serveAudio(res, 'meltdown');
   } else if (req.method === 'GET' && url === '/explosion-info') {
     json(res, { file: findAudio('explosion') });
   } else if (req.method === 'GET' && url === '/explosion') {
