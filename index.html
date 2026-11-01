@@ -142,6 +142,77 @@ h1{color:#7fb8d8;text-shadow:0 0 12px rgba(80,200,255,.35)}
 #rbBar{width:min(520px,80vw);height:10px;border:1px solid #6a4a22;border-radius:5px;overflow:hidden;background:repeating-linear-gradient(45deg,#1a1408 0 8px,#120d05 8px 16px)}
 #rbFill{display:block;height:100%;width:0;background:linear-gradient(90deg,#ff7a2a,#ffd35a);transition:width .25s}
 #rbTime{font-size:clamp(14px,2.4vw,22px);color:#ffe3b0;font-variant-numeric:tabular-nums}
+
+/* ===== diseño adaptable: PC, tablet y celular (horizontal / vertical) =====
+   El script detectLayout() pone body[data-layout] = pc | tablet | phone-land | phone-port */
+@media (pointer:coarse){
+  input[type=range]{height:30px}
+  button{min-height:38px}
+}
+/* celular en vertical */
+body[data-layout=phone-port] #top{flex-wrap:wrap;gap:4px 8px;padding:6px 8px}
+body[data-layout=phone-port] #brand{min-width:0;flex:1 1 55%;order:1}
+body[data-layout=phone-port] h1{display:none}
+body[data-layout=phone-port] #status{font-size:11px;padding:4px 6px}
+body[data-layout=phone-port] #link{display:none}
+body[data-layout=phone-port] #requirements{font-size:9px;margin-top:3px;max-width:none}
+body[data-layout=phone-port] #nav{order:2;flex:0 0 auto;gap:4px}
+body[data-layout=phone-port] #nav a{padding:6px 7px;font-size:9px;letter-spacing:.04em}
+body[data-layout=phone-port] #tempbox{order:3;flex:1 1 100%}
+body[data-layout=phone-port] #temp{font-size:24px}
+body[data-layout=phone-port] #thermo{height:8px;margin-top:3px}
+body[data-layout=phone-port] .ticks{display:none}
+body[data-layout=phone-port] #sndbox{order:4;flex:1 1 100%;gap:5px}
+body[data-layout=phone-port] #sndbox button{padding:6px 5px;font-size:9px;letter-spacing:0;flex:none;white-space:nowrap}
+body[data-layout=phone-port] #sndbox input[type=range]{flex:1 1 0;width:0;min-width:0}
+body[data-layout=phone-port] #bottom{padding:8px;gap:8px}
+body[data-layout=phone-port] #ctr{order:-1;width:100%}
+body[data-layout=phone-port] #ctr button{padding:12px 8px}
+body[data-layout=phone-port] .card{width:calc(50% - 4px);padding:8px 10px}
+body[data-layout=phone-port] label{font-size:10px;margin-bottom:2px}
+body[data-layout=phone-port] #thermalHud{left:auto;right:6px;top:calc(var(--topH,170px) + 10px);transform:none;width:150px;padding:7px 8px}
+body[data-layout=phone-port] #thermalDetail{display:none}
+body[data-layout=phone-port] #missions,body[data-layout=phone-port] #evBanner{width:min(200px,52vw)}
+body[data-layout=phone-port] #alert{font-size:clamp(22px,8vw,40px)}
+body[data-layout=phone-port] #toasts{width:150px;right:6px;top:calc(var(--topH,170px) + 90px) !important}
+body[data-layout=phone-port] #stamp{display:none}
+body[data-layout=phone-port] #rebuild h2{font-size:clamp(18px,6vw,30px)}
+/* celular en horizontal: barra finita y controles en una sola fila */
+body[data-layout=phone-land] #top{gap:8px;padding:4px 8px}
+body[data-layout=phone-land] #brand{min-width:0}
+body[data-layout=phone-land] h1,body[data-layout=phone-land] #link,body[data-layout=phone-land] #requirements{display:none}
+body[data-layout=phone-land] #status{font-size:10px;padding:4px 7px;letter-spacing:.04em}
+body[data-layout=phone-land] #tempbox{text-align:center;min-width:0}
+body[data-layout=phone-land] #temp{font-size:20px;white-space:nowrap}
+body[data-layout=phone-land] #thermo{height:6px;margin-top:2px}
+body[data-layout=phone-land] .ticks{display:none}
+body[data-layout=phone-land] #nav{gap:4px}
+body[data-layout=phone-land] #nav a{padding:6px 7px;font-size:9px;letter-spacing:.02em}
+body[data-layout=phone-land] #sndbox{gap:4px}
+body[data-layout=phone-land] #sndbox button{padding:6px 7px;font-size:10px;letter-spacing:0}
+body[data-layout=phone-land] #sndbox input[type=range]{width:54px}
+body[data-layout=phone-land] #bottom{flex-wrap:nowrap;align-items:flex-end;padding:6px 8px;gap:8px}
+body[data-layout=phone-land] .card{width:auto;flex:1 1 0;min-width:0;padding:5px 9px}
+body[data-layout=phone-land] label{font-size:10px;margin-bottom:0}
+body[data-layout=phone-land] #ctr{gap:6px}
+body[data-layout=phone-land] #ctr button{padding:8px 12px;font-size:11px;letter-spacing:.04em;min-height:34px}
+body[data-layout=phone-land] #thermalHud{width:132px;padding:6px 8px;left:auto;right:8px;top:46%}
+body[data-layout=phone-land] #thermalDetail{display:none}
+body[data-layout=phone-land] #shieldHead{margin-top:5px}
+body[data-layout=phone-land] #missions,body[data-layout=phone-land] #evBanner{width:176px}
+body[data-layout=phone-land] #missions{padding:6px 8px}
+body[data-layout=phone-land] #mDesc,body[data-layout=phone-land] .msub,body[data-layout=phone-land] #evDesc,body[data-layout=phone-land] .gticks{display:none}
+body[data-layout=phone-land] #toasts{width:36vw;right:6px}
+body[data-layout=phone-land] .toast:nth-last-child(n+3){display:none}
+body[data-layout=phone-land] #alert{font-size:clamp(20px,6vw,34px)}
+body[data-layout=phone-land] #stamp{display:none}
+body[data-layout=phone-land] #skip{bottom:62px;right:8px}
+body[data-layout=phone-land] #rebuild{gap:8px}
+body[data-layout=phone-land] #rebuild .rbRing{width:46px;height:46px}
+body[data-layout=phone-land] #rebuild h2{font-size:clamp(16px,4.4vw,26px)}
+/* tablet */
+body[data-layout=tablet] #sndbox input[type=range]{width:70px}
+body[data-layout=tablet] #requirements{max-width:200px}
 </style>
 </head>
 <body>
@@ -770,7 +841,17 @@ const RB = { box: $('rebuild'), fill: $('rbFill'), time: $('rbTime') };
 let explode = null, meltSaid = 0;
 let W = 0, H = 0, topH = 90, botH = 100, frameCount = 0, DPR = 1, bgKey = '';
 const bgc = document.createElement('canvas');
+// Detecta el tipo de pantalla y acomoda el diseño solo (PC, tablet, celular horizontal o vertical)
+function detectLayout() {
+  const w = innerWidth, h = innerHeight;
+  let L = 'pc';
+  if (h <= 520 && w > h) L = 'phone-land';
+  else if (w <= 720 && h > w) L = 'phone-port';
+  else if (w <= 1100 && matchMedia('(pointer:coarse)').matches) L = 'tablet';
+  if (document.body.dataset.layout !== L) document.body.dataset.layout = L;
+}
 function resize() {
+  detectLayout();
   const dpr = Math.min(window.devicePixelRatio || 1, 2);
   DPR = dpr;
   const r = cv.getBoundingClientRect();
@@ -785,6 +866,7 @@ function resize() {
 }
 function measure() {
   topH = el.top.offsetHeight; botH = el.bottom.offsetHeight;
+  document.body.style.setProperty('--topH', topH + 'px');
   el.alert.style.top = (topH + 12) + 'px';
   el.intromsg.style.bottom = (botH + 14) + 'px';
   el.missions.style.top = (topH + 10) + 'px';
