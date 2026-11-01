@@ -131,6 +131,7 @@ h1{color:#7fb8d8;text-shadow:0 0 12px rgba(80,200,255,.35)}
   .card{width:calc(50% - 6px)}
 }
 
+#stamp.show{display:block !important}
 #stamp{position:fixed;left:50%;bottom:4px;transform:translateX(-50%);z-index:41;font-size:9px;letter-spacing:.12em;color:#5d7a96;opacity:.6;pointer-events:none}
 /* pantalla de reconstrucción */
 #rebuild{position:fixed;left:0;right:0;top:100px;bottom:0;z-index:20;display:flex;align-items:center;justify-content:center;flex-direction:column;gap:14px;text-align:center;background:radial-gradient(ellipse at center,rgba(8,12,22,.72),rgba(2,4,9,.93));opacity:0;pointer-events:none;transition:opacity 1.2s}
@@ -178,19 +179,20 @@ body[data-layout=phone-port] #toasts{width:150px;right:6px;top:calc(var(--topH,1
 body[data-layout=phone-port] #stamp{display:none}
 body[data-layout=phone-port] #rebuild h2{font-size:clamp(18px,6vw,30px)}
 /* celular en horizontal: barra finita y controles en una sola fila */
-body[data-layout=phone-land] #top{gap:8px;padding:4px 8px}
+body[data-layout=phone-land] #top{gap:6px;padding:4px 8px}
 body[data-layout=phone-land] #brand{min-width:0}
 body[data-layout=phone-land] h1,body[data-layout=phone-land] #link,body[data-layout=phone-land] #requirements{display:none}
-body[data-layout=phone-land] #status{font-size:10px;padding:4px 7px;letter-spacing:.04em}
+body[data-layout=phone-land] #status{font-size:9px;padding:4px 6px;letter-spacing:0;white-space:nowrap}
 body[data-layout=phone-land] #tempbox{text-align:center;min-width:0}
-body[data-layout=phone-land] #temp{font-size:20px;white-space:nowrap}
+body[data-layout=phone-land] #temp{font-size:clamp(13px,2vw,20px);white-space:nowrap}
+body[data-layout=phone-land] #tempbox{flex:0 1 auto}
 body[data-layout=phone-land] #thermo{height:6px;margin-top:2px}
 body[data-layout=phone-land] .ticks{display:none}
 body[data-layout=phone-land] #nav{gap:4px}
-body[data-layout=phone-land] #nav a{padding:6px 7px;font-size:9px;letter-spacing:.02em}
+body[data-layout=phone-land] #nav a{padding:5px 6px;font-size:8px;letter-spacing:0;white-space:nowrap}
 body[data-layout=phone-land] #sndbox{gap:4px}
-body[data-layout=phone-land] #sndbox button{padding:6px 7px;font-size:10px;letter-spacing:0}
-body[data-layout=phone-land] #sndbox input[type=range]{width:54px}
+body[data-layout=phone-land] #sndbox button{padding:5px 6px;font-size:9px;letter-spacing:0;white-space:nowrap}
+body[data-layout=phone-land] #sndbox input[type=range]{width:44px}
 body[data-layout=phone-land] #bottom{flex-wrap:nowrap;align-items:flex-end;padding:6px 8px;gap:8px}
 body[data-layout=phone-land] .card{width:auto;flex:1 1 0;min-width:0;padding:5px 9px}
 body[data-layout=phone-land] label{font-size:10px;margin-bottom:0}
@@ -210,6 +212,32 @@ body[data-layout=phone-land] #skip{bottom:62px;right:8px}
 body[data-layout=phone-land] #rebuild{gap:8px}
 body[data-layout=phone-land] #rebuild .rbRing{width:46px;height:46px}
 body[data-layout=phone-land] #rebuild h2{font-size:clamp(16px,4.4vw,26px)}
+/* celular horizontal con poca altura (el navegador gasta espacio arriba): todo más compacto */
+body[data-layout=phone-land] #missions{width:172px;padding:4px 8px}
+body[data-layout=phone-land] #gauge,body[data-layout=phone-land] #missions .mrow:last-child{display:none}
+body[data-layout=phone-land] #mName{margin-top:3px;font-size:10px;line-height:1.2}
+body[data-layout=phone-land] #mOut{margin-top:2px}
+body[data-layout=phone-land] #mMW{font-size:15px}
+body[data-layout=phone-land] .mbar{margin-top:4px;height:5px}
+body[data-layout=phone-land] .mrow{margin-top:3px}
+body[data-layout=phone-land] #mScore{font-size:12px}
+body[data-layout=phone-land] #evBanner{width:172px;padding:5px 8px 7px;gap:7px}
+body[data-layout=phone-land] #evIcon{font-size:18px}
+body[data-layout=phone-land] #evName{font-size:10px;letter-spacing:.08em}
+body[data-layout=phone-land] #evFix{padding:4px 8px;min-height:26px;font-size:10px}
+body[data-layout=phone-land] #bottom{padding:4px 8px;gap:6px}
+body[data-layout=phone-land] .card{padding:3px 9px 4px}
+body[data-layout=phone-land] input[type=range]{height:22px}
+body[data-layout=phone-land] #ctr button{min-height:30px;padding:6px 10px}
+body[data-layout=phone-land] #toasts{width:42vw;left:50%;right:auto;transform:translateX(-50%);top:auto !important;bottom:calc(var(--botH,60px) + 4px)}
+body[data-layout=phone-land] .toast:nth-last-child(n+2){display:none}
+body[data-layout=phone-land] .mhead{font-size:8px;letter-spacing:.06em}
+body[data-layout=phone-land] #mName{white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+body[data-layout=phone-land] #evBanner{left:auto;right:8px;width:190px;top:calc(var(--topH,47px) + 6px) !important}
+body[data-layout=phone-land] #evDesc{display:none}
+body[data-layout=phone-land] #thermalHud{top:calc(var(--topH,47px) + 92px);transform:none}
+body[data-layout=phone-land] .toast{padding:5px 8px;font-size:9px}
+body[data-layout=phone-land] #thermalHud{padding:5px 8px}
 /* tablet */
 body[data-layout=tablet] #sndbox input[type=range]{width:70px}
 body[data-layout=tablet] #requirements{max-width:200px}
@@ -849,6 +877,12 @@ function detectLayout() {
   else if (w <= 720 && h > w) L = 'phone-port';
   else if (w <= 1100 && matchMedia('(pointer:coarse)').matches) L = 'tablet';
   if (document.body.dataset.layout !== L) document.body.dataset.layout = L;
+  // abrí la página con ?info al final de la dirección para ver qué diseño detectó
+  if (/[?&]info\b/.test(location.search)) {
+    const st = document.getElementById('stamp');
+    st.classList.add('show');
+    st.textContent = 'diseño: ' + L + ' · pantalla ' + w + '×' + h + ' · intro 27+10 s';
+  }
 }
 function resize() {
   detectLayout();
@@ -867,6 +901,7 @@ function resize() {
 function measure() {
   topH = el.top.offsetHeight; botH = el.bottom.offsetHeight;
   document.body.style.setProperty('--topH', topH + 'px');
+  document.body.style.setProperty('--botH', botH + 'px');
   el.alert.style.top = (topH + 12) + 'px';
   el.intromsg.style.bottom = (botH + 14) + 'px';
   el.missions.style.top = (topH + 10) + 'px';
