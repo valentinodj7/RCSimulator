@@ -594,12 +594,19 @@ const MIME = {
 };
 
 // Busca inicio / meltdown / explosion junto a server.js y también dentro de la carpeta "musica".
+// Ignora mayúsculas, espacios, guiones y guiones bajos: "Alarma Inicio.MP3" también sirve para alarma_inicio.
+function normName(s) {
+  return s.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/[\s_-]+/g, '');
+}
 function findAudio(base) {
+  const want = normName(base);
   for (const dir of ['', 'musica/']) {
-    for (const e of AUDIO_EXT) {
-      if (fs.existsSync(path.join(__dirname, dir + base + e))) {
-        return dir + base + e;
-      }
+    let files = [];
+    try { files = fs.readdirSync(path.join(__dirname, dir || '.')); } catch (e) { continue; }
+    for (const f of files) {
+      const ext = path.extname(f).toLowerCase();
+      if (!AUDIO_EXT.includes(ext)) continue;
+      if (normName(path.basename(f, path.extname(f))) === want) return dir + f;
     }
   }
 
@@ -618,7 +625,7 @@ function serveAudio(res, base) {
   }
 
   res.writeHead(200, {
-    'Content-Type': MIME[path.extname(f)] ||
+    'Content-Type': MIME[path.extname(f).toLowerCase()] ||
       'application/octet-stream'
   });
 

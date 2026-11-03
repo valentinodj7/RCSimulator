@@ -192,7 +192,7 @@ body[data-layout=phone-land] #nav{gap:4px}
 body[data-layout=phone-land] #nav a{padding:5px 6px;font-size:8px;letter-spacing:0;white-space:nowrap}
 body[data-layout=phone-land] #sndbox{gap:4px}
 body[data-layout=phone-land] #sndbox button{padding:5px 6px;font-size:9px;letter-spacing:0;white-space:nowrap}
-body[data-layout=phone-land] #sndbox input[type=range]{width:44px}
+body[data-layout=phone-land] #sndbox input[type=range]{width:38px}
 body[data-layout=phone-land] #bottom{flex-wrap:nowrap;align-items:flex-end;padding:6px 8px;gap:8px}
 body[data-layout=phone-land] .card{width:auto;flex:1 1 0;min-width:0;padding:5px 9px}
 body[data-layout=phone-land] label{font-size:10px;margin-bottom:0}
@@ -299,6 +299,7 @@ body[data-layout=tablet] #requirements{max-width:200px}
       <button id="voz">🗣 VOZ IA</button>
       <input id="vol" type="range" min="0" max="100" value="60" title="Volumen general">
       <input id="volVoz" type="range" min="0" max="100" value="80" title="Volumen de la voz IA">
+      <input id="volAlarm" type="range" min="0" max="100" value="60" title="Volumen de las alarmas">
     </div>
   </div>
 
@@ -327,7 +328,7 @@ const el = {
   fuel: $('fuel'), cool: $('cool'), fuelV: $('fuelV'), coolV: $('coolV'),
   ign: $('ign'), scram: $('scram'), status: $('status'), temp: $('temp'),
   fill: $('fill'), link: $('link'), alert: $('alert'), requirements: $('requirements'),
-  vol: $('vol'), volVoz: $('volVoz'), snd: $('snd'), mus: $('mus'), top: $('top'), bottom: $('bottom'),
+  vol: $('vol'), volVoz: $('volVoz'), volAlarm: $('volAlarm'), snd: $('snd'), mus: $('mus'), top: $('top'), bottom: $('bottom'),
   skip: $('skip'), count: $('count'), intromsg: $('intromsg'),
   thermalHud: $('thermalHud'), thermalState: $('thermalState'), thermalDetail: $('thermalDetail'),
   shieldValue: $('shieldValue'), shieldFill: $('shieldFill'),
@@ -467,7 +468,7 @@ const Snd = (() => {
       const src = ac.createBufferSource();
       src.buffer = audioBuf;
       src.connect(musicGain);
-      musicLevel = 0.6;
+      musicLevel = 0.9;
       curSrc = src; trackIdx = i;
       src.onended = () => { if (curSrc === src) playTrack((trackIdx + 1) % tracks.length); };
       src.start();
@@ -617,7 +618,7 @@ const Snd = (() => {
   function introTick() { tone(900, 0.07, 0.1, 'triangle', 0); }
   function introIgnite(hasSong) {
     const k = hasSong ? 0.5 : 1;
-    if (!alarmBuf['alarma_inicio']) klaxon(2, 0.08);
+    if (!alarmBuf['alarma_inicio']) klaxon(2, 0.2);
     tone(70, 2.0, 0.6 * k, 'sine', 0, 28);
     noiseBurst(1.6, 0.6 * k, 'lowpass', 5000, 120, 0);
     noiseBurst(0.4, 0.3 * k, 'highpass', 3000, 9000, 0);
@@ -710,23 +711,27 @@ const Snd = (() => {
     tone(600, 0.1, 0.15, 'square', 0.45);
   }
   // alarmas: cortas, suaves y siempre limitadas (nada suena en bucle sin fin)
-  let lastKlaxon = 0;
+  let lastKlaxon = 0, alarmMul = 1; // alarmMul: volumen de las alarmas (barra), 1 = normal
+  function setAlarmVol(m) { alarmMul = m; }
   // alarmas personalizadas (alarma_inicio / alarma_meltdown): si existen se usan en lugar de las sintéticas
   const alarmBuf = {}, alarmUntil = {}, alarmSrc = {};
+  let alarmsLoading = null;
+  // espera (hasta 3 s) a que las alarmas propias estén listas antes de empezar la intro
+  function waitAlarms() { return Promise.race([alarmsLoading || Promise.resolve(), new Promise((r) => setTimeout(r, 3000))]); }
   function loadAlarms() {
-    for (const n of ['alarma_inicio', 'alarma_meltdown']) {
+    alarmsLoading = Promise.all(['alarma_inicio', 'alarma_meltdown'].map((n) =>
       fetch('/sonido-info?n=' + n).then((r) => r.json()).then((i) => {
         if (!i || !i.file) return null;
         return fetch('/sonido?n=' + n).then((r) => r.arrayBuffer()).then((b) => ac.decodeAudioData(b));
-      }).then((b) => { if (b) alarmBuf[n] = b; }).catch(() => {});
-    }
+      }).then((b) => { if (b) alarmBuf[n] = b; }).catch(() => {})
+    ));
   }
   // devuelve true si hay un archivo propio (suena, o ya está sonando); false = usar la sintética
   function playAlarmFile(n) {
     if (!ac || !alarmBuf[n]) return false;
     if (ac.currentTime < (alarmUntil[n] || 0)) return true;
     const src = ac.createBufferSource(); src.buffer = alarmBuf[n];
-    const g = ac.createGain(); g.gain.value = 0.9;
+    const g = ac.createGain(); g.gain.value = 0.9 * alarmMul;
     src.connect(g); g.connect(master); src.start();
     alarmUntil[n] = ac.currentTime + alarmBuf[n].duration;
     alarmSrc[n] = src;
@@ -736,18 +741,18 @@ const Snd = (() => {
     for (const n of Object.keys(alarmSrc)) { try { alarmSrc[n].stop(); } catch (e) { /* ya parada */ } delete alarmSrc[n]; alarmUntil[n] = 0; }
   }
   function klaxon(cycles, vol) {
-    const v = vol || 0.09;
+    const v = (vol || 0.09) * alarmMul;
     for (let i = 0; i < cycles; i++) {
-      tone(880, 0.32, v, 'triangle', i * 0.7, 640);
-      tone(640, 0.32, v, 'triangle', i * 0.7 + 0.35, 880);
+      tone(880, 0.32, v, 'sawtooth', i * 0.7, 640);
+      tone(640, 0.32, v, 'sawtooth', i * 0.7 + 0.35, 880);
     }
   }
   function startChirps() {
     // aviso de arranque: tres pitidos que suben
-    for (let i = 0; i < 3; i++) tone(440, 0.22, 0.08, 'triangle', 0.1 + i * 0.4, 880);
+    for (let i = 0; i < 3; i++) tone(440, 0.22, 0.2 * alarmMul, 'sawtooth', 0.1 + i * 0.4, 880);
   }
   function meltdown() {
-    if (!playAlarmFile('alarma_meltdown')) klaxon(4, 0.11);
+    if (!playAlarmFile('alarma_meltdown')) klaxon(4, 0.26);
     if (ac) lastKlaxon = ac.currentTime + 2.8;
     // aviso de inicio de la cuenta: grave y corto (la explosión viene 2:10 después)
     tone(90, 1.4, 0.4, 'sine', 0, 30);
@@ -862,7 +867,7 @@ const Snd = (() => {
       // alarma de emergencia cada tanto; más seguido en los últimos 30 s y 10 s
       const leftM = (S.meltSeconds || 130) - S.phaseTime;
       const gapK = leftM <= 10 ? 2.2 : (leftM <= 30 ? 6 : 14);
-      if (t - lastKlaxon > gapK) { lastKlaxon = t; if (!playAlarmFile('alarma_meltdown')) klaxon(leftM <= 10 ? 1 : 2, 0.1); }
+      if (t - lastKlaxon > gapK) { lastKlaxon = t; if (!playAlarmFile('alarma_meltdown')) klaxon(leftM <= 10 ? 1 : 2, 0.24); }
       const gap = Math.max(0.45, 3 - 2.55 * mk);
       if (t - lastBeep > gap) {
         lastBeep = t;
@@ -899,7 +904,7 @@ const Snd = (() => {
     el.mus.className = (ac && enabled && musicOn) ? 'on' : '';
   }
   return {
-    unlock, onChange, update, setVol, toggle, toggleMusic, nextTrack, refreshBtn,
+    unlock, onChange, update, setVol, setAlarmVol, waitAlarms, testAlarm: () => klaxon(1, 0.2), toggle, toggleMusic, nextTrack, refreshBtn,
     prepareIntro, introStart, introStop, introTube, introTick, introIgnite, introDone: ready, setIntroActive, sfx,
   };
 })();
@@ -1135,6 +1140,7 @@ async function introBegin() {
   Snd.unlock();
   let hasSong = false;
   try { hasSong = await Snd.prepareIntro(); } catch (e) { hasSong = false; }
+  try { await Snd.waitAlarms(); } catch (e) { /* seguir igual */ }
   resetIntroFlags();
   el.skip.style.display = 'block';
   Intro.hasSong = hasSong;
@@ -1478,6 +1484,11 @@ const Voice = (() => {
 try { const sv = localStorage.getItem('plrc_voice_vol'); if (sv !== null) el.volVoz.value = sv; } catch (e) { /* sin almacenamiento */ }
 el.volVoz.addEventListener('input', () => { try { localStorage.setItem('plrc_voice_vol', el.volVoz.value); } catch (e) { /* sin almacenamiento */ } });
 el.volVoz.addEventListener('change', () => Voice.say('Volumen de la voz.', true));
+// volumen de las alarmas: 60 = normal, 0 = silencio, 100 = casi el doble
+try { const sa = localStorage.getItem('plrc_alarm_vol'); if (sa !== null) el.volAlarm.value = sa; } catch (e) { /* sin almacenamiento */ }
+Snd.setAlarmVol(Number(el.volAlarm.value) / 60);
+el.volAlarm.addEventListener('input', () => { Snd.setAlarmVol(Number(el.volAlarm.value) / 60); try { localStorage.setItem('plrc_alarm_vol', el.volAlarm.value); } catch (e) { /* sin almacenamiento */ } });
+el.volAlarm.addEventListener('change', () => Snd.testAlarm());
 el.voz.addEventListener('click', () => Voice.toggle());
 Voice.refresh();
 const VOICE_LINES = {
