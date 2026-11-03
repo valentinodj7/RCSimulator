@@ -602,6 +602,7 @@ const Snd = (() => {
   }
   function introStop() {
     if (!ac) return;
+    stopAlarmFiles();
     for (const n of introNodes) n.gain.setTargetAtTime(0, ac.currentTime, 0.1);
     if (songGain) {
       songGain.gain.setTargetAtTime(0, ac.currentTime, 0.15);
@@ -704,6 +705,7 @@ const Snd = (() => {
     tone(990, 0.45, 0.12, 'sine', 1.5);
   }
   function scram() {
+    stopAlarmFiles();
     tone(120, 0.14, 0.4, 'square', 0);
     noiseBurst(0.18, 0.4, 'lowpass', 2500, 200, 0);
     tone(500, 1.1, 0.22, 'sawtooth', 0.05, 40);
@@ -712,7 +714,12 @@ const Snd = (() => {
   }
   // alarmas: cortas, suaves y siempre limitadas (nada suena en bucle sin fin)
   let lastKlaxon = 0, alarmMul = 1; // alarmMul: volumen de las alarmas (barra), 1 = normal
-  function setAlarmVol(m) { alarmMul = m; }
+  const alarmGain = {};
+  // el volumen se aplica en vivo, también a una alarma que ya está sonando
+  function setAlarmVol(m) {
+    alarmMul = m;
+    if (ac) for (const n of Object.keys(alarmGain)) alarmGain[n].gain.setTargetAtTime(0.9 * m, ac.currentTime, 0.03);
+  }
   // alarmas personalizadas (alarma_inicio / alarma_meltdown): si existen se usan en lugar de las sintéticas
   const alarmBuf = {}, alarmUntil = {}, alarmSrc = {};
   let alarmsLoading = null;
@@ -734,11 +741,14 @@ const Snd = (() => {
     const g = ac.createGain(); g.gain.value = 0.9 * alarmMul;
     src.connect(g); g.connect(master); src.start();
     alarmUntil[n] = ac.currentTime + alarmBuf[n].duration;
-    alarmSrc[n] = src;
+    alarmSrc[n] = src; alarmGain[n] = g;
     return true;
   }
   function stopAlarmFiles() {
-    for (const n of Object.keys(alarmSrc)) { try { alarmSrc[n].stop(); } catch (e) { /* ya parada */ } delete alarmSrc[n]; alarmUntil[n] = 0; }
+    for (const n of Object.keys(alarmSrc)) {
+      try { alarmGain[n].gain.setTargetAtTime(0, ac.currentTime, 0.03); alarmSrc[n].stop(ac.currentTime + 0.15); } catch (e) { /* ya parada */ }
+      delete alarmSrc[n]; delete alarmGain[n]; alarmUntil[n] = 0;
+    }
   }
   function klaxon(cycles, vol) {
     const v = (vol || 0.09) * alarmMul;
@@ -888,6 +898,7 @@ const Snd = (() => {
   function toggle() {
     if (!ac) { enabled = true; unlock(); return; }
     enabled = !enabled;
+    if (!enabled) stopAlarmFiles();
     master.gain.setTargetAtTime(enabled ? vol : 0, ac.currentTime, 0.05);
     refreshBtn();
   }
@@ -1484,10 +1495,11 @@ const Voice = (() => {
 try { const sv = localStorage.getItem('plrc_voice_vol'); if (sv !== null) el.volVoz.value = sv; } catch (e) { /* sin almacenamiento */ }
 el.volVoz.addEventListener('input', () => { try { localStorage.setItem('plrc_voice_vol', el.volVoz.value); } catch (e) { /* sin almacenamiento */ } });
 el.volVoz.addEventListener('change', () => Voice.say('Volumen de la voz.', true));
-// volumen de las alarmas: 60 = normal, 0 = silencio, 100 = casi el doble
+// volumen de las alarmas: 60 = normal, 0 = silencio, 100 = 2,5 veces más fuerte
+function alarmMulOf(v) { v = Number(v); return v <= 60 ? v / 60 : 1 + (v - 60) / 40 * 1.5; }
 try { const sa = localStorage.getItem('plrc_alarm_vol'); if (sa !== null) el.volAlarm.value = sa; } catch (e) { /* sin almacenamiento */ }
-Snd.setAlarmVol(Number(el.volAlarm.value) / 60);
-el.volAlarm.addEventListener('input', () => { Snd.setAlarmVol(Number(el.volAlarm.value) / 60); try { localStorage.setItem('plrc_alarm_vol', el.volAlarm.value); } catch (e) { /* sin almacenamiento */ } });
+Snd.setAlarmVol(alarmMulOf(el.volAlarm.value));
+el.volAlarm.addEventListener('input', () => { Snd.setAlarmVol(alarmMulOf(el.volAlarm.value)); try { localStorage.setItem('plrc_alarm_vol', el.volAlarm.value); } catch (e) { /* sin almacenamiento */ } });
 el.volAlarm.addEventListener('change', () => Snd.testAlarm());
 el.voz.addEventListener('click', () => Voice.toggle());
 Voice.refresh();
