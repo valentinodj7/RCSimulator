@@ -481,6 +481,7 @@ const Snd = (() => {
   function startMusic() {
     setupMusicBus();
     loadExplosion();
+    loadAlarms();
     fetch('/musica-info').then((r) => (r.ok ? r.json() : {}))
       .then((i) => {
         tracks = (i && i.tracks) || [];
@@ -586,7 +587,7 @@ const Snd = (() => {
   }
   function introStart(hasSong) {
     if (!ac) return;
-    startChirps();
+    if (!playAlarmFile('alarma_inicio')) startChirps();
     if (hasSong && introBuf) {
       songSrc = ac.createBufferSource(); songSrc.buffer = introBuf;
       songGain = ac.createGain(); songGain.gain.value = 1;
@@ -616,7 +617,7 @@ const Snd = (() => {
   function introTick() { tone(900, 0.07, 0.1, 'triangle', 0); }
   function introIgnite(hasSong) {
     const k = hasSong ? 0.5 : 1;
-    klaxon(2, 0.08);
+    if (!alarmBuf['alarma_inicio']) klaxon(2, 0.08);
     tone(70, 2.0, 0.6 * k, 'sine', 0, 28);
     noiseBurst(1.6, 0.6 * k, 'lowpass', 5000, 120, 0);
     noiseBurst(0.4, 0.3 * k, 'highpass', 3000, 9000, 0);
@@ -710,6 +711,30 @@ const Snd = (() => {
   }
   // alarmas: cortas, suaves y siempre limitadas (nada suena en bucle sin fin)
   let lastKlaxon = 0;
+  // alarmas personalizadas (alarma_inicio / alarma_meltdown): si existen se usan en lugar de las sintéticas
+  const alarmBuf = {}, alarmUntil = {}, alarmSrc = {};
+  function loadAlarms() {
+    for (const n of ['alarma_inicio', 'alarma_meltdown']) {
+      fetch('/sonido-info?n=' + n).then((r) => r.json()).then((i) => {
+        if (!i || !i.file) return null;
+        return fetch('/sonido?n=' + n).then((r) => r.arrayBuffer()).then((b) => ac.decodeAudioData(b));
+      }).then((b) => { if (b) alarmBuf[n] = b; }).catch(() => {});
+    }
+  }
+  // devuelve true si hay un archivo propio (suena, o ya está sonando); false = usar la sintética
+  function playAlarmFile(n) {
+    if (!ac || !alarmBuf[n]) return false;
+    if (ac.currentTime < (alarmUntil[n] || 0)) return true;
+    const src = ac.createBufferSource(); src.buffer = alarmBuf[n];
+    const g = ac.createGain(); g.gain.value = 0.9;
+    src.connect(g); g.connect(master); src.start();
+    alarmUntil[n] = ac.currentTime + alarmBuf[n].duration;
+    alarmSrc[n] = src;
+    return true;
+  }
+  function stopAlarmFiles() {
+    for (const n of Object.keys(alarmSrc)) { try { alarmSrc[n].stop(); } catch (e) { /* ya parada */ } delete alarmSrc[n]; alarmUntil[n] = 0; }
+  }
   function klaxon(cycles, vol) {
     const v = vol || 0.09;
     for (let i = 0; i < cycles; i++) {
@@ -722,7 +747,7 @@ const Snd = (() => {
     for (let i = 0; i < 3; i++) tone(440, 0.22, 0.08, 'triangle', 0.1 + i * 0.4, 880);
   }
   function meltdown() {
-    klaxon(4, 0.11);
+    if (!playAlarmFile('alarma_meltdown')) klaxon(4, 0.11);
     if (ac) lastKlaxon = ac.currentTime + 2.8;
     // aviso de inicio de la cuenta: grave y corto (la explosión viene 2:10 después)
     tone(90, 1.4, 0.4, 'sine', 0, 30);
@@ -791,7 +816,7 @@ const Snd = (() => {
       if (p.ignited && !c.ignited) scram();
     }
     if (p.phase !== 'MELTDOWN' && c.phase === 'MELTDOWN') { meltdown(); startMeltSong(); }
-    if (p.phase === 'MELTDOWN' && c.phase !== 'MELTDOWN') stopMeltSong();
+    if (p.phase === 'MELTDOWN' && c.phase !== 'MELTDOWN') { stopMeltSong(); stopAlarmFiles(); }
     if (p.phase === 'MELTDOWN' && c.phase === 'COOLDOWN') explosion();
     if (p.phase === 'COOLDOWN' && c.phase === 'NORMAL') ready();
   }
@@ -837,7 +862,7 @@ const Snd = (() => {
       // alarma de emergencia cada tanto; más seguido en los últimos 30 s y 10 s
       const leftM = (S.meltSeconds || 130) - S.phaseTime;
       const gapK = leftM <= 10 ? 2.2 : (leftM <= 30 ? 6 : 14);
-      if (t - lastKlaxon > gapK) { lastKlaxon = t; klaxon(leftM <= 10 ? 1 : 2, 0.1); }
+      if (t - lastKlaxon > gapK) { lastKlaxon = t; if (!playAlarmFile('alarma_meltdown')) klaxon(leftM <= 10 ? 1 : 2, 0.1); }
       const gap = Math.max(0.45, 3 - 2.55 * mk);
       if (t - lastBeep > gap) {
         lastBeep = t;

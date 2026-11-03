@@ -123,6 +123,8 @@ const shimJs = `// Reemplaza al servidor: el reactor corre dentro de esta págin
       case '/inicio': return info().then(function (a) { return audioFile(a.inicio); });
       case '/meltdown-info': return info().then(function (a) { return json({ file: a.meltdown }); });
       case '/meltdown': return info().then(function (a) { return audioFile(a.meltdown); });
+      case '/sonido-info': return info().then(function (a) { return json({ file: (a.alarmas || {})[url.searchParams.get('n')] || null }); });
+      case '/sonido': return info().then(function (a) { return audioFile((a.alarmas || {})[url.searchParams.get('n')]); });
       case '/explosion-info': return info().then(function (a) { return json({ file: a.explosion }); });
       case '/explosion': return info().then(function (a) { return audioFile(a.explosion); });
       default: return realFetch(input, init);
@@ -167,10 +169,10 @@ function listAudio() {
   scan('musica');
   tracks.sort((a, b) => a.name.localeCompare(b.name, undefined, { numeric: true }));
   const one = (base) => {
-    for (const e of AUDIO_EXT) if (fs.existsSync(path.join(ROOT, base + e))) return { name: base + e, from: path.join(ROOT, base + e) };
+    for (const dir of ['', 'musica']) for (const e of AUDIO_EXT) if (fs.existsSync(path.join(ROOT, dir, base + e))) return { name: base + e, from: path.join(ROOT, dir, base + e) };
     return null;
   };
-  return { tracks, inicio: one('inicio'), explosion: one('explosion'), meltdown: one('meltdown') };
+  return { tracks, one, inicio: one('inicio'), explosion: one('explosion'), meltdown: one('meltdown') };
 }
 
 // ---------- armar la carpeta ----------
@@ -197,7 +199,8 @@ for (const ic of ['icon192.png', 'icon512.png']) {
 
 const au = listAudio();
 const copy = (a) => { fs.copyFileSync(a.from, path.join(OUT, 'audio', a.name)); files.push('audio/' + encodeURIComponent(a.name)); return a.name; };
-const audioJson = { tracks: au.tracks.map(copy), inicio: au.inicio ? copy(au.inicio) : null, explosion: au.explosion ? copy(au.explosion) : null, meltdown: au.meltdown ? copy(au.meltdown) : null };
+const audioJson = { tracks: au.tracks.map(copy), inicio: au.inicio ? copy(au.inicio) : null, explosion: au.explosion ? copy(au.explosion) : null, meltdown: au.meltdown ? copy(au.meltdown) : null, alarmas: {} };
+for (const n of ['alarma_inicio', 'alarma_meltdown']) { const a = au.one(n); if (a) audioJson.alarmas[n] = copy(a); }
 fs.writeFileSync(path.join(OUT, 'audio.json'), JSON.stringify(audioJson, null, 2));
 
 // service worker: guarda todo para que funcione sin internet

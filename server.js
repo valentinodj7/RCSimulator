@@ -593,15 +593,21 @@ const MIME = {
   '.m4a': 'audio/mp4'
 };
 
+// Busca inicio / meltdown / explosion junto a server.js y también dentro de la carpeta "musica".
 function findAudio(base) {
-  for (const e of AUDIO_EXT) {
-    if (fs.existsSync(path.join(__dirname, base + e))) {
-      return base + e;
+  for (const dir of ['', 'musica/']) {
+    for (const e of AUDIO_EXT) {
+      if (fs.existsSync(path.join(__dirname, dir + base + e))) {
+        return dir + base + e;
+      }
     }
   }
 
   return null;
 }
+
+// Alarmas personalizadas: alarma_inicio.mp3 y alarma_meltdown.mp3 (junto a server.js o en la carpeta musica)
+const SONIDOS = ['alarma_inicio', 'alarma_meltdown'];
 
 function serveAudio(res, base) {
   const f = findAudio(base);
@@ -762,6 +768,13 @@ const server = http.createServer((req, res) => {
       console.log('Voz IA: ' + e.message + ' (se usa la voz del navegador)');
       res.writeHead(502); res.end();
     });
+  } else if (req.method === 'GET' && url === '/sonido-info') {
+    const n = new URL(req.url, 'http://x').searchParams.get('n');
+    json(res, { file: SONIDOS.includes(n) ? findAudio(n) : null });
+  } else if (req.method === 'GET' && url === '/sonido') {
+    const n = new URL(req.url, 'http://x').searchParams.get('n');
+    if (!SONIDOS.includes(n)) { res.writeHead(404); return res.end(); }
+    serveAudio(res, n);
   } else if (req.method === 'GET' && url === '/meltdown-info') {
     json(res, { file: findAudio('meltdown') });
   } else if (req.method === 'GET' && url === '/meltdown') {
@@ -829,6 +842,11 @@ server.listen(PORT, '0.0.0.0', () => {
     console.log('Pagina: ' + path.join(__dirname, 'index.html'));
     if (m0) console.log('Intro: cuenta regresiva ' + m0[1] + ' s + ignicion ' + (m0[2] - m0[1]) + ' s');
   } catch (e) { /* sin index.html */ }
+
+  console.log('Alarma de inicio: ' + (findAudio('alarma_inicio') || 'no hay (poné alarma_inicio.mp3 para usar la tuya)'));
+  console.log('Alarma de meltdown: ' + (findAudio('alarma_meltdown') || 'no hay (poné alarma_meltdown.mp3 para usar la tuya)'));
+  console.log('Cancion del meltdown: ' + (findAudio('meltdown') || 'no hay (poné meltdown.mp3 junto a server.js)'));
+  console.log('Sonido de explosion: ' + (findAudio('explosion') || 'no hay (se usa uno sintetico)'));
 
   const a = findAudio('inicio');
   const m = findAudio('musica');
