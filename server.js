@@ -654,6 +654,24 @@ function serveTrack(res, name) {
   res.writeHead(200, { 'Content-Type': MIME[path.extname(f).toLowerCase()] || 'application/octet-stream' });
   fs.createReadStream(path.join(__dirname, f)).pipe(res);
 }
+// ---- Música de apagado de emergencia: archivos que empiezan con "apagado" (junto a server.js o en "musica") ----
+function apagados() {
+  const out = [];
+  for (const dir of ['', 'musica']) {
+    try {
+      for (const f of fs.readdirSync(path.join(__dirname, dir || '.'))) {
+        if (/^apagado/i.test(f) && AUDIO_EXT.includes(path.extname(f).toLowerCase())) out.push(dir ? dir + '/' + f : f);
+      }
+    } catch (e) { /* no existe la carpeta */ }
+  }
+  return out.sort((a, b) => path.basename(a).localeCompare(path.basename(b), undefined, { numeric: true }));
+}
+function serveApagado(res, name) {
+  const f = apagados().find((x) => x === name);
+  if (!f) { res.writeHead(404); return res.end(); }
+  res.writeHead(200, { 'Content-Type': MIME[path.extname(f).toLowerCase()] || 'application/octet-stream' });
+  fs.createReadStream(path.join(__dirname, f)).pipe(res);
+}
 function json(res, obj) {
   res.writeHead(200, {
     'Content-Type': 'application/json'
@@ -790,6 +808,19 @@ const server = http.createServer((req, res) => {
     json(res, { file: findAudio('explosion') });
   } else if (req.method === 'GET' && url === '/explosion') {
     serveAudio(res, 'explosion');
+  } else if (req.method === 'GET' && (url === '/salvaguardia' || url === '/salvaguardia.html')) {
+    fs.readFile(path.join(__dirname, 'salvaguardia.html'), (err, data) => {
+      if (err) { res.writeHead(500); return res.end('Falta salvaguardia.html'); }
+      res.writeHead(200, { 'Content-Type': 'text/html; charset=utf-8' });
+      res.end(data);
+    });
+
+  } else if (req.method === 'GET' && url === '/apagado-info') {
+    json(res, { tracks: apagados() });
+
+  } else if (req.method === 'GET' && url === '/apagado') {
+    serveApagado(res, new URL(req.url, 'http://x').searchParams.get('f'));
+
   } else if (req.method === 'GET' && url === '/musica-info') {
     json(res, { file: playlist()[0] || null, tracks: playlist() });
 
