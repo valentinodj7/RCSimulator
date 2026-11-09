@@ -13,6 +13,7 @@ const PORT = process.env.PORT || 3000;
 const TIMESCALE = Number(process.env.TIMESCALE) || 1;
 const AMBIENT = 20;
 const MELT_AT = 500000;
+const SG_SECONDS = 6;      // descenso de emergencia de la salvaguardia
 const MELT_SECONDS = 130;   // cuenta hasta la explosión: 2 min 10 s
 const COOL_SECONDS = 13.2;  // 3,2 s de explosión + 10 s de pantalla de reconstrucción
 const LOG_RANGE = Math.log10(MELT_AT / AMBIENT);
@@ -347,6 +348,21 @@ function step(dt) {
     return;
   }
 
+  if (s.sgCool) {
+    // descenso de emergencia: la temperatura baja hasta 20 °C
+    let x = Math.log10(Math.max(s.temp, AMBIENT * 1.0001) / AMBIENT);
+    x -= dt * LOG_RANGE / SG_SECONDS;
+    s.shieldIntegrity = Math.min(100, s.shieldIntegrity + dt * 12);
+    if (x <= 0.002) {
+      s.temp = AMBIENT;
+      s.sgCool = false;
+      s.shieldIntegrity = 100;
+    } else {
+      s.temp = AMBIENT * Math.pow(10, x);
+    }
+    return;
+  }
+
   const f = s.ignited ? s.fuel / 100 : 0;
   const c = s.coolant / 100;
 
@@ -575,11 +591,12 @@ function handleCmd(c) {
     if (s.phase === 'MELTDOWN') {
       s.phase = 'NORMAL';
       s.phaseTime = 0;
-      s.temp = MELT_AT * 0.8;
+      s.temp = MELT_AT - 1000;
       s.shieldIntegrity = 30;
       notice('good', 'SALVAGUARDIA · meltdown detenido', '');
     }
     if (s.phase === 'NORMAL') {
+      s.sgCool = true;
       s.mission = null;
       s.event = null;
       s.ignited = false;

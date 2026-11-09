@@ -120,15 +120,15 @@ function say(t){if(mute||!window.speechSynthesis)return;try{const u=new SpeechSy
 // ---------- secuencia ----------
 const OKS=[[0,'Protocolo de apagado de emergencia iniciado.'],[3,'Insertando barras de control.'],[6,'Refrigerante de emergencia al máximo.'],[9,'Contención magnética estabilizando el plasma.'],[12,'Temperatura del núcleo descendiendo.'],[15,'Apagado completado. Núcleo seguro.']];
 const BAD=[[0,'Protocolo de apagado de emergencia iniciado.'],[3,'Insertando barras de control.'],[6,'Advertencia. Barras de control atascadas.'],[9,'Error crítico. Apagado fallido.'],[12,'Salvaguardia fuera de servicio. Reintente manualmente.']];
-let seq=null,T=0,heat=.8;
-$('btn').onclick=()=>{if(busy)return;ensureAudio();busy=true;const ok=Math.random()<P_OK;seq={ok,t:0,list:ok?OKS:BAD,said:-1,end:ok?17:14};
+let seq=null,T=0,heat=.05,lastTemp=20,dispT=20;
+const fr=v=>Math.max(0,Math.min(1,Math.log10(Math.max(v,20.001)/20)/Math.log10(25000)));
+$('btn').onclick=()=>{if(busy)return;ensureAudio();busy=true;const ok=Math.random()<P_OK;seq={ok,t:0,t0:Math.max(20,lastTemp),sent:false,list:ok?OKS:BAD,said:-1,end:ok?17:14};
  refreshKeys();msg('APAGADO EN CURSO…','#ffb020');startMusic(!ok);$('steps').innerHTML='';
 };
 function finish(){const ok=seq.ok;stopMusic();
- if(ok)fetch('/cmd',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({type:'salvaguardia'})}).catch(()=>{});
  const ov=$('ov');ov.style.display='flex';ov.style.color=ok?'#2cff9a':'#ff3b4a';ov.innerHTML=ok?'NÚCLEO APAGADO<small>El reactor está seguro.</small>':'SALVAGUARDIA FALLÓ<small>El apagado no funcionó. Probá de nuevo.</small>';
  if(!ok){$('view').classList.add('flash');}
- setTimeout(()=>{ov.style.display='none';$('view').classList.remove('flash');seq=null;busy=false;kA=false;kB=false;heat=ok?0:.8;refreshKeys();msg(ok?'Apagado de emergencia completado.':'Fallo de la salvaguardia. Volvé a insertar las llaves.',ok?'#2cff9a':'#ff6b6b');},4000);}
+ setTimeout(()=>{ov.style.display='none';$('view').classList.remove('flash');seq=null;busy=false;kA=false;kB=false;refreshKeys();msg(ok?'Apagado de emergencia completado.':'Fallo de la salvaguardia. Volvé a insertar las llaves.',ok?'#2cff9a':'#ff6b6b');},4000);}
 // ---------- dibujo ----------
 const cv=$('cv'),x=cv.getContext('2d');let W=0,H=0;
 function rs(){const r=cv.getBoundingClientRect(),d=Math.min(2,devicePixelRatio||1);W=cv.width=Math.max(1,r.width*d);H=cv.height=Math.max(1,r.height*d);}
@@ -138,11 +138,14 @@ function frame(n){requestAnimationFrame(frame);const dt=Math.min(.1,(n-last)/100
  let rods=0,fail=false,alarm=false;
  if(seq){seq.t+=dt;const s=seq;
   while(s.said+1<s.list.length&&s.t>=s.list[s.said+1][0]){s.said++;say(s.list[s.said][1]);$('steps').innerHTML+='▸ '+s.list[s.said][1]+'<br>';$('steps').scrollTop=1e5;if(!s.ok&&s.said>=2){alarm=true;}}
-  if(s.ok){rods=Math.min(1,Math.max(0,(s.t-3)/9));heat+=((1-rods)*.8+.05-heat)*.03;}
-  else{rods=Math.min(.45,Math.max(0,(s.t-3)/9))+(s.t>6?Math.sin(T*30)*.01:0);fail=s.t>6;heat+=((fail?1:.8)-heat)*.02;}
+  if(s.ok){rods=Math.min(1,Math.max(0,(s.t-3)/9));
+   if(s.t>=9&&!s.sent){s.sent=true;fetch('/cmd',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({type:'salvaguardia'})}).catch(()=>{});}
+   const k=Math.max(0,Math.min(1,(s.t-9)/6));dispT=20*Math.pow(s.t0/20,1-k);}
+  else{rods=Math.min(.45,Math.max(0,(s.t-3)/9))+(s.t>6?Math.sin(T*30)*.01:0);fail=s.t>6;dispT=Math.min(500000,s.t0*(1+.015*s.t));}
+  heat+=((fr(dispT)*.8+.05)-heat)*.1;
   if(!s.ok&&s.t>6&&Math.sin(T*10)>0)beep(600,.12,.05);
   if(s.t>=s.end&&!s.fin){s.fin=true;finish();}}
- else heat+=((kA&&kB?.8:.7)-heat)*.02;
+ else{dispT=lastTemp;heat+=((fr(dispT)*.8+.05)-heat)*.1;}
  x.setTransform(1,0,0,1,0,0);x.fillStyle='#04060b';x.fillRect(0,0,W,H);
  const sc=Math.min(W,H),cx=W/2,cy=H/2,vw=sc*.5,vh=sc*.7,vx=cx-vw/2,vy=cy-vh/2;
  if(fail){x.fillStyle=`rgba(255,0,30,${.1+.1*Math.sin(T*10)})`;x.fillRect(0,0,W,H);}
@@ -153,12 +156,12 @@ function frame(n){requestAnimationFrame(frame);const dt=Math.min(.1,(n-last)/100
   const len=vh*.1+vh*.72*rods;x.fillStyle='#262e3b';x.fillRect(fx+fw*1.1,vy-sc*.08,fw*.9,len+sc*.08);x.strokeStyle='#55677e';x.lineWidth=1;x.strokeRect(fx+fw*1.1,vy-sc*.08,fw*.9,len+sc*.08);}
  if(fail&&Math.random()<.6)sparks.push({x:vx+Math.random()*vw,y:vy+vh*(.1+.2*Math.random()),vx:(Math.random()-.5)*4,vy:Math.random()*-3,a:1});
  sparks.forEach(p=>{p.x+=p.vx;p.y+=p.vy;p.vy+=.15;p.a-=.03;});sparks=sparks.filter(p=>p.a>0);sparks.forEach(p=>{x.fillStyle=`rgba(255,200,80,${p.a})`;x.fillRect(p.x,p.y,3,3);});
- x.fillStyle='#cfe6ff';x.textAlign='center';x.font=Math.max(11,sc*.05)+'px system-ui';x.fillText('TEMP '+Math.round(300+heat*1200)+' °C',cx,vy+vh+sc*.07);
+ x.fillStyle='#cfe6ff';x.textAlign='center';x.font=Math.max(11,sc*.05)+'px system-ui';x.fillText('TEMP '+Math.round(dispT).toLocaleString('es-AR')+' °C',cx,vy+vh+sc*.07);
 }
 function rr(a,b,w,h,r){x.beginPath();x.moveTo(a+r,b);x.arcTo(a+w,b,a+w,b+h,r);x.arcTo(a+w,b+h,a,b+h,r);x.arcTo(a,b+h,a,b,r);x.arcTo(a,b,a+w,b,r);x.closePath();}
 requestAnimationFrame(frame);
 // estado del reactor (se actualiza cada segundo)
-function poll(){fetch('/state',{cache:'no-store'}).then(r=>r.json()).then(s=>{if(busy||kA||kB)return;
+function poll(){fetch('/state',{cache:'no-store'}).then(r=>r.json()).then(s=>{if(!busy)lastTemp=s.temp;if(busy||kA||kB)return;
  if(s.phase==='MELTDOWN'){const l=Math.max(0,Math.ceil((s.meltSeconds||130)-s.phaseTime));msg('⚠ MELTDOWN · EXPLOSIÓN EN '+Math.floor(l/60)+':'+String(l%60).padStart(2,'0'),'#ff4d4d');}
  else if(s.phase==='COOLDOWN')msg('Reactor destruido · en reconstrucción','#ffb347');
  else msg('Reactor: '+(s.ignited?'ENCENDIDO · '+Math.round(s.temp).toLocaleString('es-AR')+' °C':'APAGADO'),s.ignited?'#ffb020':'#2cff9a');}).catch(()=>{});}
