@@ -510,7 +510,7 @@ function handleCmd(c) {
     return;
   }
 
-  if (s.phase !== 'NORMAL') return;
+  if (s.phase !== 'NORMAL' && c.type !== 'salvaguardia') return;
 
   if (c.type === 'set') {
     const requestsPumpOn =
@@ -569,6 +569,24 @@ function handleCmd(c) {
 
   } else if (c.type === 'repair') {
     startRepair();
+
+  } else if (c.type === 'salvaguardia') {
+    // Apagado de emergencia: detiene incluso un meltdown en curso
+    if (s.phase === 'MELTDOWN') {
+      s.phase = 'NORMAL';
+      s.phaseTime = 0;
+      s.temp = MELT_AT * 0.8;
+      s.shieldIntegrity = 30;
+      notice('good', 'SALVAGUARDIA · meltdown detenido', '');
+    }
+    if (s.phase === 'NORMAL') {
+      s.mission = null;
+      s.event = null;
+      s.ignited = false;
+      s.fuel = 0;
+      s.coolant = 100;
+      s.message = 'Apagado de emergencia completado.';
+    }
 
   } else if (c.type === 'scram') {
     if (s.mission) {

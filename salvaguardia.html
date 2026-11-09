@@ -123,8 +123,9 @@ const BAD=[[0,'Protocolo de apagado de emergencia iniciado.'],[3,'Insertando bar
 let seq=null,T=0,heat=.8;
 $('btn').onclick=()=>{if(busy)return;ensureAudio();busy=true;const ok=Math.random()<P_OK;seq={ok,t:0,list:ok?OKS:BAD,said:-1,end:ok?17:14};
  refreshKeys();msg('APAGADO EN CURSO…','#ffb020');startMusic(!ok);$('steps').innerHTML='';
- if(ok)fetch('/cmd',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({type:'scram'})}).catch(()=>{});};
+};
 function finish(){const ok=seq.ok;stopMusic();
+ if(ok)fetch('/cmd',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({type:'salvaguardia'})}).catch(()=>{});
  const ov=$('ov');ov.style.display='flex';ov.style.color=ok?'#2cff9a':'#ff3b4a';ov.innerHTML=ok?'NÚCLEO APAGADO<small>El reactor está seguro.</small>':'SALVAGUARDIA FALLÓ<small>El apagado no funcionó. Probá de nuevo.</small>';
  if(!ok){$('view').classList.add('flash');}
  setTimeout(()=>{ov.style.display='none';$('view').classList.remove('flash');seq=null;busy=false;kA=false;kB=false;heat=ok?0:.8;refreshKeys();msg(ok?'Apagado de emergencia completado.':'Fallo de la salvaguardia. Volvé a insertar las llaves.',ok?'#2cff9a':'#ff6b6b');},4000);}
@@ -156,7 +157,10 @@ function frame(n){requestAnimationFrame(frame);const dt=Math.min(.1,(n-last)/100
 }
 function rr(a,b,w,h,r){x.beginPath();x.moveTo(a+r,b);x.arcTo(a+w,b,a+w,b+h,r);x.arcTo(a+w,b+h,a,b+h,r);x.arcTo(a,b+h,a,b,r);x.arcTo(a,b,a+w,b,r);x.closePath();}
 requestAnimationFrame(frame);
-// estado del reactor
-function poll(){fetch('/state',{cache:'no-store'}).then(r=>r.json()).then(s=>{if(!busy&&!kA&&!kB&&$('msg').textContent==='')msg('Reactor: '+(s.ignited?'ENCENDIDO':'APAGADO'),s.ignited?'#ffb020':'#2cff9a');}).catch(()=>{});}
-poll();
+// estado del reactor (se actualiza cada segundo)
+function poll(){fetch('/state',{cache:'no-store'}).then(r=>r.json()).then(s=>{if(busy||kA||kB)return;
+ if(s.phase==='MELTDOWN'){const l=Math.max(0,Math.ceil((s.meltSeconds||130)-s.phaseTime));msg('⚠ MELTDOWN · EXPLOSIÓN EN '+Math.floor(l/60)+':'+String(l%60).padStart(2,'0'),'#ff4d4d');}
+ else if(s.phase==='COOLDOWN')msg('Reactor destruido · en reconstrucción','#ffb347');
+ else msg('Reactor: '+(s.ignited?'ENCENDIDO · '+Math.round(s.temp).toLocaleString('es-AR')+' °C':'APAGADO'),s.ignited?'#ffb020':'#2cff9a');}).catch(()=>{});}
+poll();setInterval(poll,1000);
 </script></body></html>
